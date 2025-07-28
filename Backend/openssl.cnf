@@ -1,0 +1,11 @@
+[req]
+distinguished_name = req_distinguished_name
+prompt = no
+
+[req_distinguished_name]
+C = EC
+ST = GS
+L = Guayaquil
+O = Test Organization
+OU = IT
+CN = Test User 

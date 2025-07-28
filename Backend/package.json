@@ -1,0 +1,55 @@
+{
+  "name": "backend_cb",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "dev:3002": "PORT=3002 tsx src/index.ts",
+    "dev:3003": "PORT=3003 tsx src/index.ts",
+    "test:server": "PORT=3002 tsx src/testServer.ts",
+    "start": "tsx src/index.ts",
+    "start:3002": "PORT=3002 tsx src/index.ts",
+    "start:3003": "PORT=3003 tsx src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "tsx": "^4.19.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/mongoose": "^5.11.96",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^1.4.13",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.15.4",
+    "@types/tmp": "^0.2.6",
+    "backend_cb": "file:",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "form-data": "^4.0.4",
+    "fs-extra": "^11.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.16.0",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.1",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^7.0.5",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.7",
+    "tmp": "^0.2.3",
+    "uuid": "^11.1.0"
+  }
+}
