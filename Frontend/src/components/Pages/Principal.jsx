@@ -136,11 +136,11 @@ function Principal() {
 
         // Crear documento con datos del servidor
         const newDocument = {
-          id: response._id || response.id || Math.random().toString(36).substr(2, 9),
-          name: response.nombre || file.name,
-          size: file.size,
-          type: file.type,
-          uploadDate: new Date(),
+          id: response.documento?._id || response._id || response.id || Math.random().toString(36).substr(2, 9),
+          name: response.documento?.nombre_original || response.nombre || file.name,
+          size: response.documento?.tamano || file.size,
+          type: response.documento?.tipo_archivo || file.type,
+          uploadDate: new Date(response.documento?.fecha_subida) || new Date(),
           status: DocumentStatus.READY,
           url: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
           signedBy: null,

@@ -4,6 +4,7 @@ import PDFSignatureSelector from './PDFSignatureSelector';
 import { generateQRForCertificate } from '../services/QRService';
 import { signDocumentWithCertificate, validateCertificatePassword } from '../services/DocumentSigningService';
 import { getToken } from '../services/authService';
+import API_CONFIG from '../../config/api.js';
 
 const DocumentSigningModal = ({ 
   isOpen, 
@@ -162,38 +163,13 @@ const DocumentSigningModal = ({
         canvasDimensions
       );
 
-      // Si la firma fue exitosa y tenemos el PDF en base64, descargarlo automáticamente
-      if (result.success && result.pdfBase64) {
-        console.log('✅ Firma exitosa, descargando PDF...');
+      // Si la firma fue exitosa, mostrar mensaje de éxito
+      if (result.success) {
+        console.log('✅ Firma exitosa');
         console.log('  fileName:', result.fileName);
-        console.log('  pdfBase64 length:', result.pdfBase64.length);
-        
-        try {
-          // Convertir base64 a blob y descargar
-          const pdfBytes = atob(result.pdfBase64);
-          const pdfArray = new Uint8Array(pdfBytes.length);
-          for (let i = 0; i < pdfBytes.length; i++) {
-            pdfArray[i] = pdfBytes.charCodeAt(i);
-          }
-          
-          const blob = new Blob([pdfArray], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          const link = window.document.createElement('a');
-          link.href = url;
-          link.download = result.fileName || 'documento-firmado.pdf';
-          window.document.body.appendChild(link);
-          link.click();
-          window.document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-          
-          console.log('✅ PDF descargado automáticamente');
-          showNotification('success', 'Documento firmado y descargado correctamente');
-        } catch (downloadError) {
-          console.error('❌ Error descargando automáticamente:', downloadError);
-          showNotification('success', 'Documento firmado correctamente');
-        }
+        showNotification('success', 'Documento firmado correctamente');
       } else {
-        console.log('❌ No se recibió PDF en base64');
+        console.log('❌ Firma no exitosa');
         showNotification('success', 'Documento firmado correctamente');
       }
       
@@ -209,11 +185,116 @@ const DocumentSigningModal = ({
 
 
 
+  // Verificar que el documento esté listo para firmar
+  const [documentReady, setDocumentReady] = useState(false);
+  const [documentError, setDocumentError] = useState(null);
+  const [documentChecking, setDocumentChecking] = useState(false);
+
+  useEffect(() => {
+    const checkDocumentReady = async (retryCount = 0) => {
+      if (!document || (!document._id && !document.id)) {
+        setDocumentError('Documento no válido');
+        return;
+      }
+
+      setDocumentChecking(true);
+      setDocumentError(null);
+
+      try {
+        // Verificar que el documento tenga los datos necesarios
+        const docId = document._id || document.id;
+        if (!docId || !document.name) {
+          throw new Error('El documento no tiene los datos necesarios');
+        }
+
+        // El documento está listo si tiene ID y nombre
+        setDocumentReady(true);
+        setDocumentError(null);
+      } catch (error) {
+        console.error('Error checking document ready state:', error);
+        
+        // Si el documento no está procesado y no hemos intentado demasiadas veces, reintentar
+        if (error.message.includes('datos necesarios') && retryCount < 3) {
+          console.log(`Reintentando verificación del documento (intento ${retryCount + 1}/3)...`);
+          setTimeout(() => {
+            checkDocumentReady(retryCount + 1);
+          }, 2000); // Esperar 2 segundos antes de reintentar
+          return;
+        }
+        
+        setDocumentError(error.message);
+        setDocumentReady(false);
+      } finally {
+        setDocumentChecking(false);
+      }
+    };
+
+    if (isOpen && document) {
+      checkDocumentReady();
+    }
+  }, [isOpen, document]);
+
   if (!isOpen || !document || !document.id) {
     if (isOpen && (!document || !document.id)) {
       console.error('No se proporcionó un documento válido al modal de firma:', document);
     }
     return null;
+  }
+
+  // Mostrar carga mientras se verifica el documento
+  if (documentChecking) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Verificando documento...
+            </h2>
+            <p className="text-gray-600">
+              Comprobando que el documento esté listo para firmar
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mostrar error si el documento no está listo
+  if (documentError) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Documento no disponible
+            </h2>
+            <p className="text-gray-600 mb-4">{documentError}</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Recargar página
+              </button>
+              <button
+                onClick={onClose}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Cancelar
+              </button>
+            </div>
+            {documentError.includes('procesando') && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  💡 <strong>Sugerencia:</strong> Si acabas de subir el documento, espera unos segundos antes de intentar firmarlo.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -281,11 +362,11 @@ const DocumentSigningModal = ({
               <p className="text-sm text-gray-600 mb-4">
                 Arrastre el marcador a la posición donde desea colocar su firma en el documento.
               </p>
-              <div className="border rounded-lg p-4 bg-gray-50">
+              <div className="border rounded-lg p-4 bg-gray-50 h-96">
                 <PDFSignatureSelector 
                   document={document} 
                   onPositionSelect={handlePositionSelect} 
-                  showPositionSelector={showPositionSelector}
+                  onCancel={() => setStep('select-certificate')}
                 />
               </div>
               {signaturePosition && (
@@ -532,13 +613,7 @@ const DocumentSigningModal = ({
       </div>
 
       {/* Position Selector Modal */}
-      {showPositionSelector && (
-        <PDFSignatureSelector
-          document={document}
-          onPositionSelect={handlePositionSelect}
-          onCancel={() => setShowPositionSelector(false)}
-        />
-      )}
+      {/* Eliminado: Ya no se usa la versión modal, solo la embebida */}
     </>
   );
 };

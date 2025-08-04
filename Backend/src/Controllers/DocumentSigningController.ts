@@ -191,11 +191,25 @@ export const signDocument = async (req: Request, res: Response, next: NextFuncti
     const certificate = await Certificado.findOne({ _id: certificateId, userId });
 
     if (!document) {
+      console.log('❌ Documento no encontrado:', { documentId, userId });
       return res.status(404).json({ message: 'Documento no encontrado' });
     }
 
     if (!certificate) {
+      console.log('❌ Certificado no encontrado:', { certificateId, userId });
       return res.status(404).json({ message: 'Certificado no encontrado' });
+    }
+
+    // Verificar que el documento tenga una ruta válida
+    if (!document.ruta) {
+      console.log('❌ Documento sin ruta válida:', { documentId, ruta: document.ruta });
+      return res.status(400).json({ message: 'El documento no está completamente procesado. Por favor, espera unos segundos y vuelve a intentar.' });
+    }
+
+    // Verificar que el archivo del documento exista
+    if (!fs.existsSync(document.ruta)) {
+      console.log('❌ Archivo de documento no existe:', document.ruta);
+      return res.status(404).json({ message: 'El archivo del documento no se encuentra en el servidor' });
     }
 
     // Crear archivos temporales

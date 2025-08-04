@@ -48,9 +48,8 @@ export async function getUserDocuments() {
     
     const data = await response.json();
     
-
-    return (data.documentos || []).map(doc => {
-      return {
+    const mappedDocuments = (data.documentos || []).map(doc => {
+      const mappedDoc = {
         id: doc._id || doc.id,
         nombre: doc.nombre_original || doc.nombre || doc.name,
         nombre_archivo: doc.nombre_archivo || '',
@@ -64,7 +63,11 @@ export async function getUserDocuments() {
         firmadoPor: doc.firmadoPor || doc.signedBy,
         fechaFirma: doc.fechaFirma || doc.signedDate
       };
+      
+      return mappedDoc;
     });
+    
+    return mappedDocuments;
   } catch (error) {
     console.error('Error al obtener documentos:', error);
     throw error;
