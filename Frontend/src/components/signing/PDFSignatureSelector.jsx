@@ -20,13 +20,26 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
   const [pdfError, setPdfError] = useState(null);
   const pdfContainerRef = useRef(null);
   
-  // Nuevos estados para el modo de posicionamiento
+  // Estados para posicionamiento manual
   const [positioningMode, setPositioningMode] = useState(false);
-  const [pdfPosition, setPdfPosition] = useState({ x: 0, y: 0 });
-  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  
+  // Obtener posición guardada del localStorage o usar posición por defecto
+  const getStoredPosition = () => {
+    const stored = localStorage.getItem('signaturePosition');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        console.error('Error parsing stored position:', e);
+      }
+    }
+    return { x: 200, y: 200 }; // Posición por defecto
+  };
+  
+  const [currentPosition, setCurrentPosition] = useState(getStoredPosition());
 
-  // Convertir el documento a URL si es necesario
+  // Convertir el documento a URL si es necesario y establecer posición fija
   useEffect(() => {
     if (!document) {
       console.error('No document provided to PDFSignatureSelector');
@@ -56,6 +69,9 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
         } else {
           setPdfUrl('');
         }
+        
+        // Establecer posición guardada o por defecto
+        setPosition(currentPosition);
       } catch (error) {
         console.error('Error checking document ready state:', error);
         setPdfError(error);
@@ -64,18 +80,6 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
     
     checkDocumentReady();
   }, [document]);
-
-  // Función simple para manejar clics en el PDF
-  const handlePdfClick = (e) => {
-    if (!positioningMode) return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setPosition({ x, y });
-    console.log('PDF clicked at:', { x, y });
-  };
 
   const handleZoomIn = () => {
     setScale(prev => Math.min(prev + 0.1, 3.0));
@@ -93,81 +97,51 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
     setPageNumber(prev => Math.min(prev + 1, numPages || 1));
   };
 
-  // Funciones para el modo de posicionamiento
+  // Función para manejar clics en el PDF
+  const handlePdfClick = (e) => {
+    if (!positioningMode) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setSelectedPosition({ x, y });
+    console.log('PDF clicked at:', { x, y });
+  };
+
+  // Función para guardar la posición seleccionada
+  const handleSavePosition = () => {
+    if (selectedPosition) {
+      localStorage.setItem('signaturePosition', JSON.stringify(selectedPosition));
+      setCurrentPosition(selectedPosition);
+      setPosition(selectedPosition);
+      setPositioningMode(false);
+      console.log('Posición guardada:', selectedPosition);
+    }
+  };
+
+  // Función para activar/desactivar modo de posicionamiento
   const togglePositioningMode = () => {
     setPositioningMode(!positioningMode);
     if (!positioningMode) {
-      setPosition({ x: 0, y: 0 }); // Resetear posición al activar modo
+      setSelectedPosition(null);
     }
-  };
-
-  const handleMouseDown = (e) => {
-    if (!positioningMode) return;
-    
-    setIsDraggingPdf(true);
-    setDragStart({
-      x: e.clientX - pdfPosition.x,
-      y: e.clientY - pdfPosition.y
-    });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!positioningMode || !isDraggingPdf) return;
-    
-    setPdfPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDraggingPdf(false);
   };
 
   const handleConfirmPosition = () => {
-    console.log('Confirmando posición:', position);
-    
-    if (!pdfContainerRef.current) {
-      console.error('No se pudo obtener la referencia del contenedor PDF');
-      return;
-    }
-    
-    const container = pdfContainerRef.current;
-    const rect = container.getBoundingClientRect();
-    
-    // Calcular posición en porcentaje relativo al tamaño del contenedor
-    const xPercent = (position.x / rect.width) * 100;
-    const yPercent = (position.y / rect.height) * 100;
-    
-    console.log('Coordenadas calculadas:', {
-      pixels: { x: Math.round(position.x), y: Math.round(position.y) },
-      percent: { x: Math.round(xPercent), y: Math.round(yPercent) },
-      container: { width: rect.width, height: rect.height }
-    });
-    
-    console.log('Llamando a onPositionSelect con:', {
-      type: 'custom',
-      pageNumber,
-      x: xPercent,
-      y: yPercent,
-      page: pageNumber,
-      scale: scale,
-      coordinates: {
-        x: Math.round(position.x),
-        y: Math.round(position.y)
-      }
-    });
+    const finalPosition = selectedPosition || currentPosition;
+    console.log('Confirmando posición:', finalPosition);
     
     onPositionSelect({
-      type: 'custom',
+      type: 'fixed',
       pageNumber,
-      x: xPercent,
-      y: yPercent,
+      x: finalPosition.x,
+      y: finalPosition.y,
       page: pageNumber,
       scale: scale,
       coordinates: {
-        x: Math.round(position.x),
-        y: Math.round(position.y)
+        x: finalPosition.x,
+        y: finalPosition.y
       }
     });
   };
@@ -210,10 +184,13 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
       <div className="flex justify-between items-center p-3 border-b bg-gray-50">
         <div>
           <h3 className="text-lg font-semibold text-gray-800">
-            Selecciona la posición de la firma
+            Seleccionar posición de la firma
           </h3>
           <p className="text-xs text-gray-600">
-            {positioningMode ? 'Modo activo: Haz clic en el PDF para posicionar la firma' : 'Activa el modo de posicionamiento para seleccionar la ubicación'}
+            {positioningMode 
+              ? 'Haz clic en el PDF para seleccionar la posición de la firma' 
+              : 'Activa el modo de posicionamiento para elegir dónde colocar la firma'
+            }
           </p>
         </div>
         <button
@@ -286,22 +263,20 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
               </span>
             </button>
             
-            {/* Botón para limpiar posición */}
-            {position && position.x > 0 && position.y > 0 && (
+            {/* Botón para guardar posición */}
+            {selectedPosition && (
               <button
-                onClick={() => setPosition({ x: 0, y: 0 })}
-                className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                onClick={handleSavePosition}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
               >
-                Limpiar
+                Guardar
               </button>
             )}
             
-            {/* Información de posición */}
-            {position && position.x > 0 && position.y > 0 && (
-              <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
-                X: {Math.round(position.x)}px, Y: {Math.round(position.y)}px
-              </div>
-            )}
+            {/* Información de posición actual */}
+            <div className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+              Posición: {Math.round(currentPosition.x)}%, {Math.round(currentPosition.y)}%
+            </div>
           </div>
         </div>
 
@@ -309,19 +284,14 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
         <div 
           className="flex-1 overflow-auto bg-gray-100 relative" 
           ref={pdfContainerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
         >
           {pdfUrl ? (
             <div className="w-full h-full relative">
               <div 
                 className="w-full h-full relative"
                 style={{
-                  transform: `scale(${scale}) translate(${pdfPosition.x}px, ${pdfPosition.y}px)`,
-                  transformOrigin: 'top left',
-                  cursor: positioningMode ? 'crosshair' : 'default'
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left'
                 }}
               >
                 <embed
@@ -344,54 +314,50 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
                   }}
                 />
                 
-                {/* Marcador de posición */}
-                {position && position.x > 0 && position.y > 0 && (
-                  <>
-                    {/* Círculo principal */}
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: position.x - 20,
-                        top: position.y - 20,
-                        width: 40,
-                        height: 40,
-                        backgroundColor: 'rgba(59, 130, 246, 0.9)',
-                        borderRadius: '50%',
-                        border: '3px solid white',
-                        boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10
-                      }}
-                    >
-                      <FaSignature className="text-white" size={20} />
-                    </div>
-                    
-                    {/* Líneas de guía */}
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: position.x - 1,
-                        top: 0,
-                        width: 2,
-                        height: position.y - 20,
-                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                        zIndex: 5
-                      }}
-                    />
-                    <div
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: 0,
-                        top: position.y - 1,
-                        width: position.x - 20,
-                        height: 2,
-                        backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                        zIndex: 5
-                      }}
-                    />
-                  </>
+                {/* Marcador de posición actual */}
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${currentPosition.x}%`,
+                    top: `${currentPosition.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: 40,
+                    height: 40,
+                    backgroundColor: 'rgba(59, 130, 246, 0.9)',
+                    borderRadius: '50%',
+                    border: '3px solid white',
+                    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 10
+                  }}
+                >
+                  <FaSignature className="text-white" size={20} />
+                </div>
+                
+                {/* Marcador de posición seleccionada (temporal) */}
+                {selectedPosition && (
+                  <div
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${selectedPosition.x}%`,
+                      top: `${selectedPosition.y}%`,
+                      transform: 'translate(-50%, -50%)',
+                      width: 40,
+                      height: 40,
+                      backgroundColor: 'rgba(34, 197, 94, 0.9)',
+                      borderRadius: '50%',
+                      border: '3px solid white',
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 11
+                    }}
+                  >
+                    <FaSignature className="text-white" size={20} />
+                  </div>
                 )}
               </div>
               
@@ -461,19 +427,11 @@ const PDFSignatureSelector = ({ document, onPositionSelect, onCancel }) => {
         </button>
         <button
           onClick={handleConfirmPosition}
-          disabled={!position.x || !position.y}
-          className={`px-3 py-1 text-xs rounded flex items-center space-x-1 ${
-            position.x && position.y 
-              ? 'bg-green-600 text-white hover:bg-green-700' 
-              : 'bg-gray-400 text-gray-600 cursor-not-allowed'
-          }`}
+          className="px-3 py-1 text-xs rounded flex items-center space-x-1 bg-green-600 text-white hover:bg-green-700"
         >
           <FaSignature size={12} />
           <span>
-            {position.x && position.y 
-              ? `Confirmar (${Math.round(position.x)}, ${Math.round(position.y)})` 
-              : 'Selecciona posición'
-            }
+            Confirmar posición ({Math.round(currentPosition.x)}%, {Math.round(currentPosition.y)}%)
           </span>
         </button>
       </div>

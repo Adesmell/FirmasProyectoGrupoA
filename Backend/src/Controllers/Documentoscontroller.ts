@@ -5,23 +5,43 @@ import path from 'path';
 
 export const uploadDocumento = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    console.log("🔄 Iniciando subida de documento...");
+    console.log("📁 Archivo recibido:", req.file);
+    console.log("👤 Usuario:", req.user);
+
     // El archivo subido estará en req.file
     const file = req.file as Express.Multer.File;
     if (!file) {
+      console.log("❌ No se subió ningún archivo");
       res.status(400).json({ mensaje: "No se subió ningún archivo" });
-      return next();
+      return;
     }
 
     // Verificar que existe usuario autenticado
     if (!req.user || !req.user.id) {
-      console.log("Error: Usuario no autenticado o sin ID", req.user);
+      console.log("❌ Usuario no autenticado o sin ID", req.user);
       res.status(401).json({ mensaje: "Usuario no autenticado" });
-      return next();
+      return;
     }
 
-    console.log("Usuario autenticado:", req.user);
+    console.log("✅ Usuario autenticado:", req.user);
     const userId = req.user.id.toString();
-    console.log("ID de usuario que sube el documento:", userId);
+    console.log("🆔 ID de usuario que sube el documento:", userId);
+
+    // Verificar que el archivo sea un PDF
+    if (file.mimetype !== 'application/pdf') {
+      console.log("❌ Tipo de archivo no válido:", file.mimetype);
+      res.status(400).json({ mensaje: "Solo se permiten archivos PDF" });
+      return;
+    }
+
+    // Verificar tamaño del archivo (máximo 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      console.log("❌ Archivo demasiado grande:", file.size);
+      res.status(413).json({ mensaje: "El archivo es demasiado grande. Máximo 10MB" });
+      return;
+    }
 
     // Guardar información en MongoDB
     const nuevoDocumento = new Documento({
@@ -34,26 +54,35 @@ export const uploadDocumento = async (req: Request, res: Response, next: NextFun
       usuario_id: userId
     });
     
-    console.log("Guardando documento con datos:", {
+    console.log("💾 Guardando documento con datos:", {
       nombre_original: file.originalname,
       nombre_archivo: file.filename,
+      tamano: file.size,
       usuario_id: userId
     });
     
     const documentoGuardado = await nuevoDocumento.save();
-    console.log("Documento guardado correctamente:", documentoGuardado);
+    console.log("✅ Documento guardado correctamente:", documentoGuardado._id);
 
-    res.status(201).json({ 
+    const responseData = {
       mensaje: "Archivo subido correctamente", 
       documento: {
-        ...documentoGuardado.toObject(),
-        usuario_id: userId
+        _id: documentoGuardado._id,
+        nombre_original: documentoGuardado.nombre_original,
+        nombre_archivo: documentoGuardado.nombre_archivo,
+        ruta: documentoGuardado.ruta,
+        tamano: documentoGuardado.tamano,
+        tipo_archivo: documentoGuardado.tipo_archivo,
+        fecha_subida: documentoGuardado.fecha_subida,
+        usuario_id: documentoGuardado.usuario_id
       }
-    });
+    };
+
+    console.log("📤 Enviando respuesta:", responseData);
+    res.status(201).json(responseData);
   } catch (error) {
-    console.error('Error al subir el archivo:', error);
-    res.status(500).json({ mensaje: "Error al subir el archivo", error });
-    return next(error);
+    console.error('❌ Error al subir el archivo:', error);
+    res.status(500).json({ mensaje: "Error interno del servidor al subir el archivo" });
   }
 };
 

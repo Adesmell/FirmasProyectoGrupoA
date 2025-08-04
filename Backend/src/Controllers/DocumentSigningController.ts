@@ -253,10 +253,10 @@ export const signDocument = async (req: Request, res: Response, next: NextFuncti
       // Ejecutar Python con pyHanko
       const pythonScriptPath = path.join(__dirname, '../../API_Pyhanko/firmar-pdf.py');
       const page = signaturePosition?.page || 1;
-      const x1 = signaturePosition?.x || 50;
-      const y1 = signaturePosition?.y || 50;
-      const x2 = signaturePosition?.x2 || 250;
-      const y2 = signaturePosition?.y2 || 150;
+      const x1 = signaturePosition?.x || 100; //Tamaño del certificado
+      const y1 = signaturePosition?.y || 275; //Tamaño del certificado - movido más arriba
+      const x2 = signaturePosition?.x2 || 250; //Tamaño del certificado
+      const y2 = signaturePosition?.y2 || 250; //Tamaño del certificado - movido más arriba
 
       const command = `python "${pythonScriptPath}" "${tempCert}" "${password}" "${tempPdfInput}" "${tempPdfOutput}" "${page}" "${x1}" "${y1}" "${x2}" "${y2}" "${tempCaCert}"`;
       

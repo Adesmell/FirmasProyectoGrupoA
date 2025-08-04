@@ -21,7 +21,6 @@ const DocumentSigningModal = ({
   const [password, setPassword] = useState('');
   const [qrData, setQrData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showPositionSelector, setShowPositionSelector] = useState(true);
   const [isSigned, setIsSigned] = useState(false);
 
   // Resetear el estado cuando se cierra el modal
@@ -33,7 +32,6 @@ const DocumentSigningModal = ({
       setPassword('');
       setQrData(null);
       setIsLoading(false);
-      setShowPositionSelector(true);
       setIsSigned(false);
     }
   }, [isOpen]);
@@ -41,7 +39,6 @@ const DocumentSigningModal = ({
   // Manejar la selección de posición
   const handlePositionSelect = useCallback((position) => {
     setSignaturePosition(position);
-    setShowPositionSelector(false);
     setStep('select-certificate');
   }, []);
 
@@ -353,37 +350,40 @@ const DocumentSigningModal = ({
             </div>
           </div>
 
-          {/* Step 1: Select Position */}
-          {step === 'select-position' && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Seleccione la ubicación de la firma
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Arrastre el marcador a la posición donde desea colocar su firma en el documento.
-              </p>
-              <div className="border rounded-lg p-4 bg-gray-50 h-96">
-                <PDFSignatureSelector 
-                  document={document} 
-                  onPositionSelect={handlePositionSelect} 
-                  onCancel={() => setStep('select-certificate')}
-                />
-              </div>
-              {signaturePosition && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    Ubicación seleccionada: X: {signaturePosition.x}%, Y: {signaturePosition.y}%
-                  </p>
-                  <button
-                    onClick={() => setStep('select-certificate')}
-                    className="mt-2 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Continuar con esta ubicación
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                     {/* Step 1: Select Position */}
+           {step === 'select-position' && (
+             <div>
+               <h3 className="text-lg font-medium text-gray-900 mb-4">
+                 Seleccione la ubicación de la firma
+               </h3>
+               <p className="text-sm text-gray-600 mb-4">
+                 Haz clic en el PDF para seleccionar dónde colocar la firma. Esta posición se guardará para futuras firmas.
+               </p>
+               <div className="border rounded-lg p-4 bg-gray-50 h-96">
+                 <PDFSignatureSelector 
+                   document={document} 
+                   onPositionSelect={handlePositionSelect} 
+                   onCancel={() => setStep('select-certificate')}
+                 />
+               </div>
+               {signaturePosition && (
+                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                   <p className="text-sm text-green-800">
+                     Ubicación seleccionada: X: {signaturePosition.x}%, Y: {signaturePosition.y}%
+                   </p>
+                   <p className="text-xs text-green-600 mt-1">
+                     Esta posición se guardará y se usará para futuras firmas
+                   </p>
+                   <button
+                     onClick={() => setStep('select-certificate')}
+                     className="mt-2 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                   >
+                     Continuar con esta ubicación
+                   </button>
+                 </div>
+               )}
+             </div>
+           )}
 
           {/* Step 2: Select Certificate */}
           {step === 'select-certificate' && (

@@ -8,6 +8,10 @@ export function uploadpdf(file) {
   // Obtener el token de autenticación
   const token = getToken();
   
+  if (!token) {
+    return Promise.reject(new Error('No hay token de autenticación. Por favor, inicie sesión nuevamente.'));
+  }
+  
   return fetch(`${API_CONFIG.BASE_URL}/documentos/upload`, {
     method: 'POST',
     headers: {
@@ -15,14 +19,40 @@ export function uploadpdf(file) {
     },
     body: formData
   })
-  .then(response => {
+  .then(async response => {
     if (!response.ok) {
+      let errorMessage = 'Error al subir el archivo';
+      
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.mensaje || errorData.message || errorMessage;
+      } catch (e) {
+        // Si no se puede parsear el JSON, usar el mensaje por defecto
+      }
+      
       if (response.status === 401) {
         throw new Error('No autorizado. Por favor, inicie sesión nuevamente.');
+      } else if (response.status === 413) {
+        throw new Error('El archivo es demasiado grande.');
+      } else if (response.status === 400) {
+        throw new Error(errorMessage);
+      } else {
+        throw new Error(errorMessage);
       }
-      throw new Error('Error al subir el archivo');
     }
-    return response.json();
+    
+    const data = await response.json();
+    
+    // Verificar que la respuesta tenga la estructura esperada
+    if (!data || !data.documento) {
+      throw new Error('Respuesta inválida del servidor');
+    }
+    
+    return data;
+  })
+  .catch(error => {
+    console.error('Error en uploadpdf:', error);
+    throw error;
   });
 }
 

@@ -15,5 +15,29 @@ const DocumentStorage = multer.diskStorage({
   },
 });
 
-const uploadDoc = multer({ storage: DocumentStorage });
+// Filtro para solo aceptar PDFs
+const fileFilter = (req, file, cb) => {
+  console.log("🔍 Verificando archivo:", file.originalname, "Tipo:", file.mimetype);
+  
+  if (file.mimetype === 'application/pdf') {
+    console.log("✅ Archivo PDF válido");
+    cb(null, true);
+  } else {
+    console.log("❌ Tipo de archivo no válido:", file.mimetype);
+    cb(new Error('Solo se permiten archivos PDF'), false);
+  }
+};
+
+// Límites de archivo
+const limits = {
+  fileSize: 10 * 1024 * 1024, // 10MB
+  files: 1 // Solo un archivo por vez
+};
+
+const uploadDoc = multer({ 
+  storage: DocumentStorage,
+  fileFilter: fileFilter,
+  limits: limits
+});
+
 export { uploadDoc, DocumentStorage };

@@ -6,7 +6,7 @@ import DocumentPreview from '../document/DocumentPreview';
 import StatsCards from '../ui/StatsCards';
 import Notification from '../ui/Notification';
 import { DocumentStatus } from '../document/types';
-import { uploadpdf, getUserDocuments, deleteDocument, downloadDocument } from '../services/UploadService';
+import { uploadpdf, getUserDocuments, deleteDocument, downloadDocument, signDocument } from '../services/UploadService';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import CertificateUpload from '../certificate/CertificateUpload';
@@ -17,15 +17,18 @@ import { uploadCertificate, getUserCertificates, deleteCertificate } from '../se
 
 function Principal() {
   const [documents, setDocuments] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [previewDocument, setPreviewDocument] = useState(null);
-  const [notification, setNotification] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [certificates, setCertificates] = useState([]);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [previewDocument, setPreviewDocument] = useState(null);
+  const [showSigningModal, setShowSigningModal] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [notification, setNotification] = useState(null);
   const [showCertificateSection, setShowCertificateSection] = useState(false);
   const [certificateTab, setCertificateTab] = useState('upload'); // 'upload' or 'generate'
   const [signingModal, setSigningModal] = useState({ isOpen: false, document: null });
-  const { currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Función para cargar documentos desde el servidor
   const fetchDocuments = async (showSuccessMessage = false) => {
@@ -104,7 +107,24 @@ function Principal() {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  // Función para limpiar completamente el estado de uploadProgress
+  const clearUploadProgress = () => {
+    setUploadProgress({});
+  };
+
   const handleFileUpload = async (files) => {
+    // Verificar si ya hay una subida en progreso
+    if (isUploading) {
+      showNotification('warning', 'Espere a que termine la subida actual');
+      return;
+    }
+
+    // Limpiar cualquier progreso anterior que pueda estar colgado
+    clearUploadProgress();
+    
+    // Marcar que hay una subida en progreso
+    setIsUploading(true);
+
     showNotification('success', `Subiendo ${files.length} archivo${files.length > 1 ? 's' : ''}...`);
 
     // Inicializar progreso para cada archivo
@@ -136,48 +156,82 @@ function Principal() {
           [file.name]: 100
         }));
 
+        // Verificar que la respuesta del servidor sea válida
+        if (!response || !response.documento) {
+          throw new Error('Respuesta inválida del servidor');
+        }
+
         // Crear documento con datos del servidor
         const newDocument = {
-          id: response.documento?._id || response._id || response.id || Math.random().toString(36).substr(2, 9),
-          name: response.documento?.nombre_original || response.nombre || file.name,
-          size: response.documento?.tamano || file.size,
-          type: response.documento?.tipo_archivo || file.type,
-          uploadDate: new Date(response.documento?.fecha_subida) || new Date(),
+          id: response.documento._id || response.documento.id,
+          name: response.documento.nombre_original || file.name,
+          size: response.documento.tamano || file.size,
+          type: response.documento.tipo_archivo || file.type,
+          uploadDate: new Date(response.documento.fecha_subida) || new Date(),
           status: DocumentStatus.READY,
-          url: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+          url: response.documento.ruta || undefined,
           signedBy: null,
           signedDate: null
         };
 
-        // Agregar el nuevo documento a la lista
-        setDocuments(prev => [...prev, newDocument]);
+        // Verificar que el documento no exista ya en la lista
+        setDocuments(prev => {
+          const existingDoc = prev.find(doc => doc.id === newDocument.id);
+          if (existingDoc) {
+            console.log('Documento ya existe en la lista, actualizando...');
+            return prev.map(doc => doc.id === newDocument.id ? newDocument : doc);
+          } else {
+            console.log('Agregando nuevo documento a la lista');
+            return [...prev, newDocument];
+          }
+        });
+
+        return newDocument;
+      } catch (error) {
+        console.error('Error uploading file:', error);
         
+        // Determinar el tipo de error y mostrar mensaje apropiado
+        let errorMessage = error.message;
+        
+        if (error.message.includes('413') || error.message.includes('demasiado grande')) {
+          errorMessage = `El archivo ${file.name} es demasiado grande. Máximo 10MB.`;
+        } else if (error.message.includes('400') || error.message.includes('PDF')) {
+          errorMessage = `El archivo ${file.name} no es un PDF válido.`;
+        } else if (error.message.includes('401') || error.message.includes('autorizado')) {
+          errorMessage = 'Sesión expirada. Por favor, inicie sesión nuevamente.';
+        } else if (error.message.includes('Respuesta inválida')) {
+          errorMessage = `Error del servidor al subir ${file.name}. Intente de nuevo.`;
+        }
+        
+        showNotification('error', errorMessage);
+        
+        return null;
+      } finally {
+        // Limpiar progreso de este archivo después de un delay
         setTimeout(() => {
           setUploadProgress(prev => {
             const { [file.name]: _, ...rest } = prev;
             return rest;
           });
-        }, 1000);
-
-        return newDocument;
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        showNotification('error', `Error al subir ${file.name}: ${error.message}`);
-        
-        setUploadProgress(prev => {
-          const { [file.name]: _, ...rest } = prev;
-          return rest;
-        });
-        
-        return null;
+        }, 2000); // Aumentado a 2 segundos para que el usuario vea el 100%
       }
     });
 
-    const results = await Promise.all(uploadPromises);
-    const successCount = results.filter(Boolean).length;
-    
-    if (successCount > 0) {
-      showNotification('success', `${successCount} archivo${successCount > 1 ? 's' : ''} subido${successCount > 1 ? 's' : ''} correctamente`);
+    try {
+      const results = await Promise.all(uploadPromises);
+      const successCount = results.filter(Boolean).length;
+      
+      if (successCount > 0) {
+        showNotification('success', `${successCount} archivo${successCount > 1 ? 's' : ''} subido${successCount > 1 ? 's' : ''} correctamente`);
+        
+        // Recargar la lista de documentos desde el servidor para asegurar sincronización
+        setTimeout(() => {
+          fetchDocuments(false);
+        }, 500);
+      }
+    } finally {
+      // Marcar que la subida ha terminado
+      setIsUploading(false);
     }
   };
 

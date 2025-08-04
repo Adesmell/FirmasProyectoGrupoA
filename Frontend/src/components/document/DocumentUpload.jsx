@@ -59,6 +59,9 @@ const DocumentUpload = ({ onFileUpload, uploadProgress }) => {
 
       setError(null);
       onFileUpload(files);
+      
+      // Limpiar el input para permitir subir el mismo archivo nuevamente
+      e.target.value = '';
     }
   };
 
