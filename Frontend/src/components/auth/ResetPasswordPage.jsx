@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useNavigate, useSearchParams } from "react-router";
@@ -225,7 +225,6 @@ export const ResetPasswordPage = () => {
                 label="Nueva contraseña"
                 type={showPassword ? "text" : "password"}
                 name="newPassword"
-                icon={<Lock size={18} />}
                 required
                 autoComplete="new-password"
                 value={formData.newPassword}
@@ -246,7 +245,6 @@ export const ResetPasswordPage = () => {
                 label="Confirmar nueva contraseña"
                 type={showConfirmPassword ? "text" : "password"}
                 name="confirmPassword"
-                icon={<Lock size={18} />}
                 required
                 autoComplete="new-password"
                 value={formData.confirmPassword}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useNavigate } from "react-router";
@@ -79,7 +79,6 @@ export const ForgotPasswordPage = () => {
               label="Email"
               type="email"
               name="email"
-              icon={<Mail size={18} />}
               required
               autoComplete="email"
               value={email}

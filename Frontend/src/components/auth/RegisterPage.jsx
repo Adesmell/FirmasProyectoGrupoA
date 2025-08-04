@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { RegisterForm } from './RegisterForm';
 import { registerUser } from '../services/authService';
-import { Sparkles, CheckCircle, AlertCircle, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const RegisterPage = () => {
@@ -76,9 +75,6 @@ export const RegisterPage = () => {
       <div className="bg-white rounded-xl shadow-xl overflow-hidden transform transition-all hover:shadow-2xl">
         <div className="px-6 py-8 sm:px-10">
           <div className="mb-6 text-center">
-            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 text-blue-600 mb-4">
-              <Sparkles size={24} />
-            </div>
             <h2 className="text-2xl font-bold text-gray-900">Crear una cuenta</h2>
             <p className="mt-2 text-sm text-gray-600">
               Únete a nosotros y comienza tu viaje
@@ -97,13 +93,6 @@ export const RegisterPage = () => {
                 : 'bg-red-50 border-red-200 text-red-800'
             }`}>
               <div className="flex items-start">
-                {message.type === 'success' ? (
-                  <CheckCircle className="w-5 h-5 mr-2 text-green-600 mt-0.5" />
-                ) : message.type === 'verification-required' ? (
-                  <Mail className="w-5 h-5 mr-2 text-blue-600 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 mr-2 text-red-600 mt-0.5" />
-                )}
                 <div className="flex-1">
                   <span className="text-sm font-medium">{message.text}</span>
                   {message.type === 'verification-required' && (

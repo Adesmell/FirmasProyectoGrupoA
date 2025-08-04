@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Github } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Divider } from '../ui/Divider';
@@ -139,7 +138,6 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
         label="Nombre"
         type="text"
         name="nombre"
-        icon={<User size={18} />}
         required
         autoComplete="nombre"
         value={formData.nombre}
@@ -151,7 +149,6 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
         label="Apellido"
         type="text"
         name="apellido"
-        icon={<User size={18} />}
         required
         autoComplete="apellido"
         value={formData.apellido}
@@ -164,7 +161,6 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
           label="Correo Electrónico"
           type="email"
           name="email"
-          icon={<Mail size={18} />}
           required
           autoComplete="email"
           value={formData.email}
@@ -180,16 +176,10 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
             )}
             {emailStatus === 'available' && (
               <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
               </div>
             )}
             {emailStatus === 'taken' && (
               <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
               </div>
             )}
           </div>
@@ -212,7 +202,6 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
         label="Contraseña"
         type="password"
         name="password"
-        icon={<Lock size={18} />}
         required
         autoComplete="new-password"
         value={formData.password}
@@ -263,7 +252,6 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
         label="Confirmar Contraseña"
         type="password"
         name="confirmPassword"
-        icon={<Lock size={18} />}
         required
         autoComplete="new-password"
         value={formData.confirmPassword}
@@ -299,13 +287,8 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
             </p>
             {errors.acceptTerms && (
               <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                <div className="flex items-center">
-                  <svg className="w-4 h-4 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm text-red-700 font-medium">
-                    Debes aceptar los términos y condiciones para continuar
-                  </span>
+                <div className="text-sm text-red-700 font-medium">
+                  Debes aceptar los términos y condiciones para continuar
                 </div>
               </div>
             )}

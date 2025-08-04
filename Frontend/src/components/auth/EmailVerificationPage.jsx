@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Mail, AlertCircle } from 'lucide-react';
 
 const EmailVerificationPage = () => {
   const [searchParams] = useSearchParams();
@@ -96,7 +95,6 @@ const EmailVerificationPage = () => {
       case 'success':
         return (
           <div className="text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">¡Email verificado exitosamente!</h2>
             <p className="text-gray-600 mb-4">{message}</p>
             <p className="text-sm text-gray-500">Serás redirigido al login en unos segundos...</p>
@@ -106,7 +104,6 @@ const EmailVerificationPage = () => {
       case 'error':
         return (
           <div className="text-center">
-            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Error en la verificación</h2>
             <p className="text-gray-600 mb-4">{message}</p>
             <div className="space-y-3">
@@ -114,7 +111,6 @@ const EmailVerificationPage = () => {
                 onClick={handleResendEmail}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <Mail className="inline-block w-4 h-4 mr-2" />
                 Reenviar email de verificación
               </button>
               <br />
@@ -137,9 +133,6 @@ const EmailVerificationPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-            <Mail className="w-8 h-8" />
-          </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Verificación de Email</h1>
           <p className="text-gray-600">SignatureFlow</p>
         </div>
@@ -148,14 +141,11 @@ const EmailVerificationPage = () => {
 
         {status === 'error' && (
           <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium">¿No recibiste el email?</p>
-                <p className="text-xs mt-1">
-                  Revisa tu carpeta de spam o solicita un nuevo email de verificación.
-                </p>
-              </div>
+            <div className="text-sm text-yellow-800">
+              <p className="font-medium">¿No recibiste el email?</p>
+              <p className="text-xs mt-1">
+                Revisa tu carpeta de spam o solicita un nuevo email de verificación.
+              </p>
             </div>
           </div>
         )}
