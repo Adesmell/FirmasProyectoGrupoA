@@ -27,67 +27,69 @@ function Principal() {
   const [signingModal, setSigningModal] = useState({ isOpen: false, document: null });
   const { currentUser } = useAuth();
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        setIsLoading(true);
-        const userDocuments = await getUserDocuments();
+  // Función para cargar documentos desde el servidor
+  const fetchDocuments = async (showSuccessMessage = false) => {
+    try {
+      setIsLoading(true);
+      const userDocuments = await getUserDocuments();
+      
+      if (!userDocuments || userDocuments.length === 0) {
+        console.log("No se encontraron documentos o la respuesta está vacía");
+        setDocuments([]);
+        return;
+      }
+      
+      // Mapear los documentos del backend al formato que espera la UI
+      const formattedDocuments = userDocuments.map(doc => {
+        // Intentar crear objetos Date válidos, con fallback a null si la fecha es inválida
+        let uploadDate = null;
+        let signedDate = null;
         
-        if (!userDocuments || userDocuments.length === 0) {
-          console.log("No se encontraron documentos o la respuesta está vacía");
-          setDocuments([]);
-          return;
-        }
-        
-        // Mapear los documentos del backend al formato que espera la UI
-        const formattedDocuments = userDocuments.map(doc => {
-          // Intentar crear objetos Date válidos, con fallback a null si la fecha es inválida
-          let uploadDate = null;
-          let signedDate = null;
-          
-          try {
-            if (doc.fechaSubida || doc.uploadDate || doc.fecha_subida) {
-              uploadDate = new Date(doc.fechaSubida || doc.uploadDate || doc.fecha_subida);
-              // Verificar si la fecha es válida
-              if (isNaN(uploadDate.getTime())) uploadDate = null;
-            }
-            
-            if (doc.fechaFirma || doc.signedDate) {
-              signedDate = new Date(doc.fechaFirma || doc.signedDate);
-              // Verificar si la fecha es válida
-              if (isNaN(signedDate.getTime())) signedDate = null;
-            }
-          } catch (e) {
-            console.error('Error al procesar fechas:', e);
+        try {
+          if (doc.fechaSubida || doc.uploadDate || doc.fecha_subida) {
+            uploadDate = new Date(doc.fechaSubida || doc.uploadDate || doc.fecha_subida);
+            // Verificar si la fecha es válida
+            if (isNaN(uploadDate.getTime())) uploadDate = null;
           }
           
-          return {
-            id: doc._id || doc.id,
-            name: doc.nombre_original || doc.nombre || doc.name,
-            size: doc.tamano || doc.tamaño || doc.size || 0,
-            type: doc.tipo_archivo || doc.tipo || doc.type || 'application/pdf',
-            uploadDate: uploadDate,
-            status: doc.firmado ? DocumentStatus.SIGNED : DocumentStatus.READY,
-            url: doc.url || doc.ruta,
-            signedBy: doc.firmadoPor || doc.signedBy,
-            signedDate: signedDate
-          };
-        });
-        
-        setDocuments(formattedDocuments);
-        
-        if (formattedDocuments.length > 0) {
-          showNotification('success', `Se cargaron ${formattedDocuments.length} documentos`);
+          if (doc.fechaFirma || doc.signedDate) {
+            signedDate = new Date(doc.fechaFirma || doc.signedDate);
+            // Verificar si la fecha es válida
+            if (isNaN(signedDate.getTime())) signedDate = null;
+          }
+        } catch (e) {
+          console.error('Error al procesar fechas:', e);
         }
-      } catch (error) {
-        console.error('Error al cargar documentos:', error);
-        showNotification('error', 'No se pudieron cargar tus documentos');
-      } finally {
-        setIsLoading(false);
+        
+        return {
+          id: doc._id || doc.id,
+          name: doc.nombre_original || doc.nombre || doc.name,
+          size: doc.tamano || doc.tamaño || doc.size || 0,
+          type: doc.tipo_archivo || doc.tipo || doc.type || 'application/pdf',
+          uploadDate: uploadDate,
+          status: doc.estado === 'firmado' || doc.firmado ? DocumentStatus.SIGNED : DocumentStatus.READY,
+          url: doc.url || doc.ruta,
+          signedBy: doc.firmadoPor || doc.signedBy,
+          signedDate: signedDate
+        };
+      });
+      
+      setDocuments(formattedDocuments);
+      
+      if (showSuccessMessage && formattedDocuments.length > 0) {
+        showNotification('success', `Se cargaron ${formattedDocuments.length} documentos`);
       }
-    };
+    } catch (error) {
+      console.error('Error al cargar documentos:', error);
+      showNotification('error', 'No se pudieron cargar tus documentos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchDocuments();
+  // Cargar documentos al montar el componente
+  useEffect(() => {
+    fetchDocuments(true);
   }, []);
 
   // Bienvenida al usuario
@@ -316,19 +318,30 @@ function Principal() {
   };
 
   // Función para manejar la finalización de la firma
-  const handleSigningComplete = (result) => {
-    // Actualizar el estado del documento
-    setDocuments(prev => prev.map(doc => 
-      doc.id === result.documentId 
-        ? { 
-            ...doc, 
-            status: DocumentStatus.SIGNED, 
-            signedBy: currentUser ? `${currentUser.firstName || currentUser.nombre} ${currentUser.lastName || currentUser.apellido}` : 'Usuario',
-            signedDate: new Date(),
-            signedUrl: result.signedUrl
-          }
-        : doc
-    ));
+  const handleSigningComplete = async (result) => {
+    console.log('✅ Firma completada, actualizando lista de documentos...');
+    
+    try {
+      // Recargar documentos desde el servidor para obtener el estado actualizado
+      await fetchDocuments(false);
+      console.log('✅ Lista de documentos actualizada automáticamente');
+      showNotification('success', 'Documento firmado y lista actualizada correctamente');
+    } catch (error) {
+      console.error('❌ Error al actualizar lista de documentos:', error);
+      // Fallback: actualizar solo el documento específico
+      setDocuments(prev => prev.map(doc => 
+        doc.id === result.documentId 
+          ? { 
+              ...doc, 
+              status: DocumentStatus.SIGNED, 
+              signedBy: currentUser ? `${currentUser.firstName || currentUser.nombre} ${currentUser.lastName || currentUser.apellido}` : 'Usuario',
+              signedDate: new Date(),
+              signedUrl: result.signedUrl
+            }
+          : doc
+      ));
+      showNotification('success', 'Documento firmado correctamente');
+    }
   };
 
   return (
