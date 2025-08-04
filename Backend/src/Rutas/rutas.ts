@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, register, verifySession, verifyEmail, resendVerificationEmail } from "../Controllers/usercontroller";
+import { login, register, verifySession, verifyEmail, resendVerificationEmail, checkEmailAvailability, requestPasswordReset, resetPassword, verifyResetToken } from "../Controllers/usercontroller";
 import { uploadDocumento, getDocumentosByUsuario, previewDocumento, downloadDocumento, deleteDocumento } from '../Controllers/Documentoscontroller';
 import { uploadCertificado, getCertificado, generateCertificado, deleteCertificado, generateCertificatePyHanko } from '../Controllers/CertificadoController';
 import { validateCertificatePassword, signDocument, getDocument, downloadSignedDocument } from '../Controllers/DocumentSigningController';
@@ -32,6 +32,36 @@ router.get("/verify-email/:token", (req, res) => {
 router.post("/resend-verification", (req, res) => {
 	Promise.resolve(resendVerificationEmail(req, res)).catch((error) => {
 		console.error('Error en resendVerificationEmail:', error);
+		res.status(500).json({ message: 'Error interno del servidor' });
+	});
+});
+
+// Ruta para verificar disponibilidad de email
+router.get("/check-email", (req, res) => {
+	Promise.resolve(checkEmailAvailability(req, res)).catch((error) => {
+		console.error('Error en checkEmailAvailability:', error);
+		res.status(500).json({ message: 'Error interno del servidor' });
+	});
+});
+
+// Rutas de restablecimiento de contraseña
+router.post("/forgot-password", (req, res) => {
+	Promise.resolve(requestPasswordReset(req, res)).catch((error) => {
+		console.error('Error en requestPasswordReset:', error);
+		res.status(500).json({ message: 'Error interno del servidor' });
+	});
+});
+
+router.post("/reset-password", (req, res) => {
+	Promise.resolve(resetPassword(req, res)).catch((error) => {
+		console.error('Error en resetPassword:', error);
+		res.status(500).json({ message: 'Error interno del servidor' });
+	});
+});
+
+router.get("/verify-reset-token/:token", (req, res) => {
+	Promise.resolve(verifyResetToken(req, res)).catch((error) => {
+		console.error('Error en verifyResetToken:', error);
 		res.status(500).json({ message: 'Error interno del servidor' });
 	});
 });

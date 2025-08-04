@@ -34,15 +34,15 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Verificar si el usuario ya existe en PostgreSQL (lógica invertida)
+    // Verificar si el usuario ya existe en PostgreSQL (LÓGICA CORREGIDA)
     const existingUser = await Usuario.findOne({ 
       where: { email: email.toLowerCase() } 
     });
-    if (!existingUser) {
-      console.log('❌ Usuario NO existe en PostgreSQL:', email);
-      return res.status(409).json({ message: "El correo electrónico NO está registrado, no puedes usarlo" });
+    if (existingUser) {
+      console.log('❌ Usuario YA existe en PostgreSQL:', email);
+      return res.status(409).json({ message: "El correo electrónico ya está registrado" });
     }
-    // Si existe, dejar pasar y continuar con el registro...
+    // Si NO existe, continuar con el registro...
 
     // Validar contraseña
     if (password.length < 8) {
@@ -65,7 +65,6 @@ export const register = async (req: Request, res: Response) => {
       apellido,
       email: email.toLowerCase(),
       contraseña: hashedPassword,
-      emailVerificado: false,
       verificationToken,
       verificationTokenExpires
     });
@@ -111,6 +110,42 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Error en registro:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Nuevo endpoint para verificar disponibilidad de email
+export const checkEmailAvailability = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ 
+        message: "El parámetro email es requerido y debe ser una cadena de texto" 
+      });
+    }
+
+    console.log('🔍 Verificando disponibilidad de email:', email);
+
+    // Buscar usuario en PostgreSQL
+    const existingUser = await Usuario.findOne({ 
+      where: { email: email.toLowerCase() } 
+    });
+
+    const isAvailable = !existingUser;
+    
+    console.log('📧 Email disponible:', isAvailable);
+
+    res.json({
+      success: true,
+      email: email.toLowerCase(),
+      isAvailable,
+      message: isAvailable 
+        ? "Email disponible para registro" 
+        : "Email ya está registrado"
+    });
+  } catch (error) {
+    console.error('❌ Error verificando disponibilidad de email:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
@@ -317,6 +352,156 @@ export const verifySession = async (req: any, res: Response) => {
     });
   } catch (error) {
     console.error('❌ Error verificando sesión:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Solicitar restablecimiento de contraseña
+export const requestPasswordReset = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    console.log('🔐 Solicitud de restablecimiento de contraseña para:', email);
+
+    if (!email) {
+      return res.status(400).json({ 
+        message: "El email es requerido" 
+      });
+    }
+
+    // Buscar usuario en PostgreSQL
+    const user = await Usuario.findOne({ 
+      where: { email: email.toLowerCase() } 
+    });
+
+    if (!user) {
+      console.log('❌ Usuario no encontrado para restablecimiento:', email);
+      // Por seguridad, no revelar si el email existe o no
+      return res.json({
+        success: true,
+        message: "Si el email está registrado, recibirás un enlace para restablecer tu contraseña"
+      });
+    }
+
+    // Generar token de restablecimiento
+    const resetToken = EmailService.generatePasswordResetToken();
+    const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    // Guardar token en la base de datos
+    user.verificationToken = resetToken;
+    user.verificationTokenExpires = resetTokenExpires;
+    await user.save();
+
+    console.log('✅ Token de restablecimiento generado para:', email);
+
+    // Enviar email de restablecimiento
+    const emailSent = await EmailService.sendPasswordResetEmail(
+      user.email, 
+      resetToken, 
+      user.nombre
+    );
+
+    if (emailSent) {
+      console.log('✅ Email de restablecimiento enviado a:', email);
+      res.json({
+        success: true,
+        message: "Se ha enviado un enlace para restablecer tu contraseña a tu email"
+      });
+    } else {
+      console.log('❌ Error enviando email de restablecimiento');
+      res.status(500).json({ 
+        message: "Error enviando email de restablecimiento" 
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error en solicitud de restablecimiento:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Restablecer contraseña con token
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    console.log('🔐 Restableciendo contraseña con token');
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ 
+        message: "Token y nueva contraseña son requeridos" 
+      });
+    }
+
+    // Validar nueva contraseña
+    if (newPassword.length < 8) {
+      return res.status(422).json({ 
+        message: "La contraseña debe tener al menos 8 caracteres" 
+      });
+    }
+
+    // Buscar usuario con el token válido
+    const user = await Usuario.findOne({ 
+      where: { 
+        verificationToken: token,
+        verificationTokenExpires: { [Op.gt]: new Date() }
+      }
+    });
+
+    if (!user) {
+      console.log('❌ Token de restablecimiento inválido o expirado');
+      return res.status(400).json({ 
+        message: "Token de restablecimiento inválido o expirado" 
+      });
+    }
+
+    // Encriptar nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Actualizar contraseña y limpiar token
+    user.contraseña = hashedPassword;
+    user.clearVerificationToken();
+    await user.save();
+
+    console.log('✅ Contraseña restablecida exitosamente para:', user.email);
+
+    // Enviar email de confirmación
+    await EmailService.sendPasswordChangedEmail(user.email, user.nombre);
+
+    res.json({
+      success: true,
+      message: "Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña"
+    });
+  } catch (error) {
+    console.error('❌ Error restableciendo contraseña:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Verificar token de restablecimiento
+export const verifyResetToken = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    console.log('🔍 Verificando token de restablecimiento:', token);
+
+    const user = await Usuario.findOne({ 
+      where: { 
+        verificationToken: token,
+        verificationTokenExpires: { [Op.gt]: new Date() }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: "Token de restablecimiento inválido o expirado" 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Token válido",
+      email: user.email
+    });
+  } catch (error) {
+    console.error('❌ Error verificando token:', error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };

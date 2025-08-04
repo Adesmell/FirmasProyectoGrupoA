@@ -99,8 +99,12 @@ export const LoginForm = ({onSubmit, isLoading = false }) => {
           <span className="ml-2 text-sm text-gray-600">Remember me</span>
         </label>
         
-        <Button variant="link" type="button">
-          Forgot password?
+        <Button 
+          variant="link" 
+          type="button"
+          onClick={() => navigate('/forgot-password')}
+        >
+          ¿Olvidaste tu contraseña?
         </Button>
       </div>
       

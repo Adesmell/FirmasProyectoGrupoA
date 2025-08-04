@@ -44,7 +44,8 @@ await testPostgresConnection();
 await sequelize.sync({ alter: true }); // Sincronizar tablas
 console.log('✅ Tabla de usuarios sincronizada en PostgreSQL');
 
-// Conexión a MongoDB para documentos y certificados
+// Conexión a MongoDB para documentos y certificados (COMENTADO PARA DESARROLLO LOCAL)
+/*
 await mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/Documentos", {
     authSource: "admin",
@@ -77,6 +78,32 @@ await mongoose
     }
   })
   .catch((err) => console.error("Error de conexión a MongoDB:", err));
+*/
+
+// Conexión simple a MongoDB para desarrollo local
+await mongoose
+  .connect("mongodb://localhost:27017/Documentos")
+  .then(async () => {
+    console.log("✅ Conectado a MongoDB local");
+    
+    // Inicializar sistema CA
+    try {
+      await CAService.initializeCA();
+    } catch (error) {
+      console.log("⚠️ Error inicializando sistema CA:", error);
+    }
+
+    // Verificar configuración de email
+    try {
+      await testEmailConfig();
+    } catch (error) {
+      console.log("⚠️ Error verificando configuración de email:", error);
+    }
+  })
+  .catch((err) => {
+    console.log("⚠️ MongoDB no disponible - continuando sin MongoDB");
+    console.log("ℹ️ Para habilitar MongoDB, asegúrate de que esté corriendo en localhost:27017");
+  });
 
 app.use("/api/", router);
 

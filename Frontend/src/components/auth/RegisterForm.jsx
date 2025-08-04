@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Divider } from '../ui/Divider';
 import { useNavigate } from "react-router";
 import { SocialButton } from '../ui/SocialButton';
+import { checkEmailWithDebounce } from '../services/emailService';
 
 
 export const RegisterForm = ({ onSubmit, isLoading = false }) => {
@@ -39,34 +40,13 @@ export const RegisterForm = ({ onSubmit, isLoading = false }) => {
       }));
     }
 
-    // Verificar email en tiempo real
+    // Verificar email en tiempo real con debounce
     if (name === 'email' && value) {
-      checkEmailAvailability(value);
+      checkEmailWithDebounce(value, setEmailStatus);
     }
   };
 
-  // Función para verificar disponibilidad del email
-  const checkEmailAvailability = async (email) => {
-    if (!email || !/\S+@\S+\.\S+/.test(email)) {
-      setEmailStatus('idle');
-      return;
-    }
 
-    setEmailStatus('checking');
-    
-    try {
-      // Aquí podrías hacer una llamada a la API para verificar el email
-      // Por ahora, simularemos la verificación
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Simular verificación (en producción, esto sería una llamada real a la API)
-      const isAvailable = Math.random() > 0.5; // Simulación
-      
-      setEmailStatus(isAvailable ? 'available' : 'taken');
-    } catch (error) {
-      setEmailStatus('idle');
-    }
-  };
 
     const handleRegister = async (formData) => {
     setIsLoading(true);
