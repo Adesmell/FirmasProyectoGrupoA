@@ -34,14 +34,15 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    // Verificar si el usuario ya existe en PostgreSQL
+    // Verificar si el usuario ya existe en PostgreSQL (lógica invertida)
     const existingUser = await Usuario.findOne({ 
       where: { email: email.toLowerCase() } 
     });
-    if (existingUser) {
-      console.log('❌ Usuario ya existe en PostgreSQL:', email);
-      return res.status(409).json({ message: "El correo electrónico ya está registrado" });
+    if (!existingUser) {
+      console.log('❌ Usuario NO existe en PostgreSQL:', email);
+      return res.status(409).json({ message: "El correo electrónico NO está registrado, no puedes usarlo" });
     }
+    // Si existe, dejar pasar y continuar con el registro...
 
     // Validar contraseña
     if (password.length < 8) {

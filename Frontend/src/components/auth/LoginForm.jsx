@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Mail, Lock } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { useNavigate } from "react-router";
@@ -70,7 +69,6 @@ export const LoginForm = ({onSubmit, isLoading = false }) => {
         label="Email"
         type="email"
         name="email"
-        icon={<Mail size={18} />}
         required
         autoComplete="email"
         value={credentials.email}
@@ -82,7 +80,6 @@ export const LoginForm = ({onSubmit, isLoading = false }) => {
         label="Password"
         type="password"
         name="password"
-        icon={<Lock size={18} />}
         required
         autoComplete="current-password"
         value={credentials.password}
