@@ -321,6 +321,13 @@ export const login = async (req: Request, res: Response) => {
       emailVerificado: user.emailVerificado
     }, JWT_SECRET, { expiresIn: "1h" });
 
+    // Imprimir el token en la consola para pruebas
+    console.log('🔑 TOKEN GENERADO PARA PRUEBAS:');
+    console.log('🔑 ==========================================');
+    console.log('🔑', token);
+    console.log('🔑 ==========================================');
+    console.log('🔑 Copia este token para usar en las pruebas');
+
     res.json({
       success: true,
       token,
@@ -354,6 +361,13 @@ export const verifySession = async (req: any, res: Response) => {
       id: user.id,
       emailVerificado: user.emailVerificado
     }, JWT_SECRET, { expiresIn: "1h" });
+
+    // Imprimir el token en la consola para pruebas
+    console.log('🔑 TOKEN RENOVADO PARA PRUEBAS:');
+    console.log('🔑 ==========================================');
+    console.log('🔑', token);
+    console.log('🔑 ==========================================');
+    console.log('🔑 Copia este token para usar en las pruebas');
 
     res.json({
       success: true,

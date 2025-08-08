@@ -28,23 +28,69 @@ export async function uploadCertificate(file, password) {
   }
   
   try {
+    const token = getToken();
+    console.log('🔑 Token obtenido:', token ? `${token.substring(0, 20)}...` : 'null');
+    
+    if (!token) {
+      throw new Error('No hay token de autenticación. Por favor, inicia sesión nuevamente.');
+    }
+    
     const response = await fetch(`${API_CONFIG.BASE_URL}/certificados/upload`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${getToken()}`
+        'Authorization': `Bearer ${token}`
       },
       body: formData
     });
     
+    console.log('📡 Respuesta del servidor:', response.status, response.statusText);
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.mensaje || 'Error al subir el certificado');
+      // Leer la respuesta una sola vez
+      const responseText = await response.text();
+      console.error('Error del servidor:', responseText);
+      
+      // Intentar parsear como JSON
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+        
+        // Crear un error más específico con información adicional
+        const error = new Error(errorData.mensaje || errorData.error || 'Error al subir el certificado');
+        error.tipo = errorData.tipo || 'error_generico';
+        error.detalle = errorData.error || errorData.detalle || '';
+        error.codigo = response.status;
+        
+        throw error;
+      } catch (jsonError) {
+        // Si no es JSON válido, usar el texto como está
+        throw new Error(`Error del servidor (${response.status}): ${responseText.substring(0, 200)}`);
+      }
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log('✅ Respuesta exitosa:', result);
+    
+    // Agregar información adicional al resultado
+    result.tipo = result.tipo || 'exito';
+    result.detalle = result.detalle || 'Certificado subido correctamente';
+    
+    return result;
   } catch (error) {
     console.error('Error al subir certificado:', error);
-    throw error;
+    
+    // Si es un error de red, mostrar mensaje específico
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Error de conexión. Verifica tu conexión a internet.');
+    }
+    
+    // Si ya es un Error con mensaje, re-lanzarlo
+    if (error.message) {
+      throw error;
+    }
+    
+    // Para otros tipos de errores
+    throw new Error('Error inesperado al subir el certificado');
   }
 }
 

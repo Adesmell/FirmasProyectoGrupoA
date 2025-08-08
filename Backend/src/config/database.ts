@@ -4,10 +4,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Configuración de PostgreSQL para usuarios
-export const sequelize = new Sequelize({
-  dialect: 'postgres',
+const config = {
+  dialect: 'postgres' as const,
   host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5432'),
+  port: parseInt(process.env.POSTGRES_PORT || '5433'),
   username: process.env.POSTGRES_USER || 'postgres',
   password: process.env.POSTGRES_PASSWORD || 'admin',
   database: process.env.POSTGRES_DB || 'firmas',
@@ -18,7 +18,9 @@ export const sequelize = new Sequelize({
     acquire: 30000,
     idle: 10000
   }
-});
+};
+
+export const sequelize = new Sequelize(config);
 
 // Función para probar la conexión
 export const testPostgresConnection = async () => {

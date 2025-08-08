@@ -19,10 +19,20 @@ export const uploadCertificado = async (
   next: NextFunction
 ) => {
   try {
+    console.log('🚀 uploadCertificado iniciado');
+    console.log('📋 Request body:', req.body);
+    console.log('📁 Request file:', req.file);
+    console.log('👤 Request user:', req.user);
+    
     const file = req.file;
     const { password } = req.body;
     
+    console.log('🔍 Variables extraídas:');
+    console.log('  - file:', file ? `${file.originalname} (${file.size} bytes)` : 'null');
+    console.log('  - password:', password ? '***' : 'null');
+    
     if (!file) {
+      console.log('❌ No se subió ningún archivo');
       return res.status(400).json({ mensaje: "No se subió ningún archivo" });
     }
 
@@ -76,6 +86,26 @@ export const uploadCertificado = async (
     console.log('📄 Nombre original:', file.originalname);
     console.log('🏭 Certificado del sistema:', isSystemGenerated ? 'SÍ' : 'NO');
     
+    // Para certificados del sistema, verificar si realmente necesitan contraseña
+    if (isSystemGenerated) {
+      console.log('🔍 Verificando si el certificado del sistema necesita contraseña...');
+      // Los certificados del sistema siempre requieren contraseña (la que se usó al generarlos)
+      console.log('🔑 Certificado del sistema requiere contraseña (la proporcionada al generarlo)');
+      
+      // Verificar que el archivo sea un PKCS#12 válido intentando leer información básica
+      try {
+        console.log('🔍 Verificando estructura del archivo PKCS#12...');
+        const basicInfo = execSync(`openssl asn1parse -in "${file.path}" -inform DER -noout`, { 
+          stdio: 'pipe',
+          encoding: 'utf8',
+          timeout: 5000
+        });
+        console.log('✅ Archivo tiene estructura ASN.1 válida');
+      } catch (asnError: any) {
+        console.log('⚠️ Archivo no tiene estructura ASN.1 válida:', asnError.message);
+      }
+    }
+    
     const fileContent = fs.readFileSync(file.path);
     console.log('📄 Contenido del archivo leído:', fileContent.length, 'bytes');
     
@@ -85,54 +115,174 @@ export const uploadCertificado = async (
       return res.status(400).json({ mensaje: 'El archivo está vacío' });
     }
     
-    // Solo validar contraseña si es un certificado externo
-    if (!isSystemGenerated) {
-      console.log('🔑 Validando contraseña para certificado externo...');
-      console.log('🔑 Contraseña proporcionada:', password ? '***' : 'NO PROPORCIONADA');
-      
-      if (!password) {
-        fs.unlinkSync(file.path);
-        return res.status(400).json({ mensaje: 'Se requiere una contraseña para certificados externos' });
+    // Verificar que el archivo tenga el formato PKCS#12 correcto
+    // Los archivos PKCS#12 comienzan con una secuencia específica
+    if (fileContent.length < 4) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ mensaje: 'El archivo es demasiado pequeño para ser un certificado PKCS#12 válido' });
+    }
+    
+    // Verificar los primeros bytes del archivo (magic bytes de PKCS#12)
+    const magicBytes = fileContent.slice(0, 4);
+    console.log('🔍 Magic bytes del archivo:', magicBytes.toString('hex'));
+    
+    // Los archivos PKCS#12 típicamente comienzan con 0x30 0x82 (ASN.1 SEQUENCE)
+    if (magicBytes[0] !== 0x30) {
+      console.log('⚠️ Archivo no parece ser un PKCS#12 válido (no comienza con 0x30)');
+    }
+    
+    // Verificar que el archivo tenga un tamaño mínimo razonable para un PKCS#12
+    if (fileContent.length < 100) {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ mensaje: 'El archivo es demasiado pequeño para ser un certificado PKCS#12 válido' });
+    }
+    
+    // Validar contraseña para TODOS los certificados (excepto si es un certificado del sistema sin contraseña)
+    console.log('🔑 Validando contraseña del certificado...');
+    console.log('🔑 Contraseña proporcionada:', password ? '***' : 'NO PROPORCIONADA');
+    console.log('🏭 Certificado del sistema:', isSystemGenerated ? 'SÍ' : 'NO');
+    
+    // Para certificados del sistema, la contraseña es opcional
+    if (!isSystemGenerated && !password) {
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+          console.log('🧹 Archivo temporal eliminado - contraseña requerida');
+        }
+      } catch (deleteError: any) {
+        console.warn('⚠️ No se pudo eliminar archivo temporal:', deleteError.message);
       }
-      
-      // Validar usando OpenSSL (compatible con versión 0.9.8k)
+      return res.status(400).json({ mensaje: 'Se requiere una contraseña para certificados externos' });
+    }
+    
+    // Validar contraseña usando OpenSSL
+    if (password) {
       try {
         console.log('🔄 Validando contraseña con OpenSSL...');
-        const { execSync } = require('child_process');
         
-        // Comando simple para validar PKCS#12
-        const result = execSync(`openssl pkcs12 -info -noout -in "${file.path}" -passin pass:"${password}"`, { 
+        // Comando para validar PKCS#12 - usar stdin para evitar problemas con caracteres especiales
+        console.log('🔍 Ejecutando OpenSSL con archivo:', file.path);
+        console.log('🔍 Longitud de la contraseña:', password.length);
+
+        
+        const result = execSync(`openssl pkcs12 -info -noout -in "${file.path}" -passin stdin`, { 
+          input: password,
           stdio: 'pipe',
-          encoding: 'utf8'
+          encoding: 'utf8',
+          timeout: 10000
         });
         
-        console.log('✅ Validación con OpenSSL exitosa');
-        console.log('📋 Información del certificado:', result.trim());
+                 console.log('✅ Validación con OpenSSL exitosa');
+         console.log('📋 Información del certificado:', result.trim());
+         console.log('✅ Contraseña correcta - certificado válido');
         
       } catch (opensslError: any) {
         console.error('❌ Error validando contraseña con OpenSSL:', opensslError.message);
-        
-        // Si OpenSSL falla, verificar si es un problema de formato
-        console.log('🔍 Verificando si el archivo es un PKCS#12 válido...');
-        
-        try {
-          // Intentar extraer información básica del archivo
-          const basicInfo = execSync(`openssl pkcs12 -info -noout -in "${file.path}"`, { 
-            stdio: 'pipe',
-            encoding: 'utf8'
-          });
-          console.log('✅ Archivo PKCS#12 válido, pero contraseña incorrecta');
-        } catch (formatError: any) {
-          console.log('❌ Archivo no es un PKCS#12 válido');
+        console.error('❌ Error completo:', opensslError);
+        if (opensslError.stderr) {
+          console.error('❌ OpenSSL stderr:', opensslError.stderr.toString());
+        }
+        if (opensslError.stdout) {
+          console.error('❌ OpenSSL stdout:', opensslError.stdout.toString());
         }
         
-        fs.unlinkSync(file.path);
-        return res.status(400).json({ 
-          mensaje: 'La contraseña del certificado .p12 es incorrecta',
-          error: opensslError.message 
-        });
+                 // Para certificados del sistema, mostrar error específico sobre la contraseña
+         if (isSystemGenerated) {
+           console.log('❌ Certificado del sistema con contraseña incorrecta');
+           
+           // Verificar si es un problema de formato o contraseña
+           console.log('🔍 Verificando formato del archivo...');
+           
+           // Verificar que el archivo tenga el formato correcto leyendo los primeros bytes
+           try {
+             const fileBuffer = fs.readFileSync(file.path);
+             // Los archivos PKCS#12 comienzan con una secuencia específica
+             if (fileBuffer.length < 4) {
+               console.log('❌ Archivo demasiado pequeño para ser un PKCS#12 válido');
+             } else {
+               console.log('✅ Archivo tiene tamaño apropiado para PKCS#12');
+             }
+           } catch (readError: any) {
+             console.log('❌ No se pudo leer el archivo:', readError.message);
+           }
+           
+           // Intentar eliminar el archivo de forma segura
+           try {
+             if (fs.existsSync(file.path)) {
+               fs.unlinkSync(file.path);
+               console.log('🧹 Archivo temporal eliminado después de error de contraseña');
+             }
+           } catch (deleteError: any) {
+             console.warn('⚠️ No se pudo eliminar archivo temporal:', deleteError.message);
+           }
+
+           // Determinar el tipo específico de error basado en el mensaje de OpenSSL
+           let errorMessage = 'La contraseña del certificado .p12 es incorrecta';
+           let errorDetail = 'Contraseña incorrecta o archivo corrupto';
+           
+           if (opensslError.stderr && opensslError.stderr.toString().includes('Mac verify error')) {
+             errorMessage = 'La contraseña del certificado es incorrecta';
+             errorDetail = 'La contraseña proporcionada no coincide con la contraseña del certificado. Verifica que estés usando la contraseña correcta que se estableció al generar el certificado.';
+           } else if (opensslError.stderr && opensslError.stderr.toString().includes('unable to load PKCS12 object')) {
+             errorMessage = 'El archivo del certificado está corrupto o no es válido';
+             errorDetail = 'El archivo no es un certificado PKCS#12 válido o está dañado.';
+           }
+
+           return res.status(400).json({ 
+             mensaje: errorMessage,
+             error: errorDetail,
+             tipo: 'error_contraseña'
+           });
+                 } else {
+           // Para certificados externos, mostrar error específico sobre la contraseña
+           console.log('❌ Certificado externo con contraseña incorrecta');
+           
+           // Verificar si es un problema de formato o contraseña
+           console.log('🔍 Verificando formato del archivo...');
+           
+           // Verificar que el archivo tenga el formato correcto leyendo los primeros bytes
+           try {
+             const fileBuffer = fs.readFileSync(file.path);
+             // Los archivos PKCS#12 comienzan con una secuencia específica
+             if (fileBuffer.length < 4) {
+               console.log('❌ Archivo demasiado pequeño para ser un PKCS#12 válido');
+             } else {
+               console.log('✅ Archivo tiene tamaño apropiado para PKCS#12');
+             }
+           } catch (readError: any) {
+             console.log('❌ No se pudo leer el archivo:', readError.message);
+           }
+           
+           // Intentar eliminar el archivo de forma segura
+           try {
+             if (fs.existsSync(file.path)) {
+               fs.unlinkSync(file.path);
+               console.log('🧹 Archivo temporal eliminado después de error de contraseña');
+             }
+           } catch (deleteError: any) {
+             console.warn('⚠️ No se pudo eliminar archivo temporal:', deleteError.message);
+           }
+
+           // Determinar el tipo específico de error basado en el mensaje de OpenSSL
+           let errorMessage = 'La contraseña del certificado .p12 es incorrecta';
+           let errorDetail = 'Contraseña incorrecta o archivo corrupto';
+           
+           if (opensslError.stderr && opensslError.stderr.toString().includes('Mac verify error')) {
+             errorMessage = 'La contraseña del certificado es incorrecta';
+             errorDetail = 'La contraseña proporcionada no coincide con la contraseña del certificado. Verifica que estés usando la contraseña correcta.';
+           } else if (opensslError.stderr && opensslError.stderr.toString().includes('unable to load PKCS12 object')) {
+             errorMessage = 'El archivo del certificado está corrupto o no es válido';
+             errorDetail = 'El archivo no es un certificado PKCS#12 válido o está dañado.';
+           }
+
+           return res.status(400).json({ 
+             mensaje: errorMessage,
+             error: errorDetail,
+             tipo: 'error_contraseña'
+           });
+         }
       }
-    } else {
+    } else if (isSystemGenerated) {
       console.log('✅ Certificado del sistema detectado, omitiendo validación de contraseña');
     }
 
@@ -144,21 +294,29 @@ export const uploadCertificado = async (
     );
 
     res.status(201).json({
-      mensaje: "Certificado cargado y encriptado correctamente",
+      mensaje: "Certificado cargado y validado correctamente",
       certificateId,
       certificado: {
         id: certificateId,
         nombre: file.originalname,
         fechaSubida: new Date(),
         emisor: "Sistema de Firma Digital", 
-      }
+      },
+      tipo: 'exito',
+      detalle: 'La contraseña del certificado es correcta y el archivo ha sido validado exitosamente.'
     });
   } catch (error) {
-    console.error("Error al subir certificado:", error);
+    console.error("❌ Error al subir certificado:", error);
+    console.error("❌ Stack trace:", (error as Error).stack);
 
     // Asegurar que el archivo temporal se elimina en caso de error
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try {
+        fs.unlinkSync(req.file.path);
+        console.log('🧹 Archivo temporal eliminado');
+      } catch (cleanupError) {
+        console.error('❌ Error eliminando archivo temporal:', cleanupError);
+      }
     }
 
     res.status(500).json({

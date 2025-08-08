@@ -1,28 +1,30 @@
-import { useState } from 'react';
-import { Upload, Key, Shield, AlertCircle, Lock } from 'lucide-react';
-import { validateFile } from '../document/types';
+import React, { useState } from 'react';
+import { Upload, Key, Shield, Lock } from 'lucide-react';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 
 const CertificateUpload = ({ onCertificateUpload }) => {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [error, setError] = useState(null);
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const validationError = validateFile(file, 'certificate');
-      
-      if (validationError) {
-        setError(validationError);
-        setSelectedFile(null);
-        setTimeout(() => setError(null), 5000);
-      } else {
-        setError(null);
-        setSelectedFile(file);
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tipo de archivo
+      if (!file.name.toLowerCase().endsWith('.p12')) {
+        alert('Por favor selecciona un archivo .p12 válido');
+        return;
       }
+      
+      // Validar tamaño (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('El archivo es demasiado grande. Máximo 5MB permitido.');
+        return;
+      }
+      
+      setSelectedFile(file);
+      setPassword(''); // Limpiar contraseña al cambiar archivo
     }
   };
 
@@ -34,24 +36,30 @@ const CertificateUpload = ({ onCertificateUpload }) => {
     e.preventDefault();
     
     if (!selectedFile) {
-      setError('Por favor, selecciona un archivo de certificado');
+      alert('Por favor selecciona un archivo de certificado');
       return;
     }
-
+    
     if (!password) {
-      setError('Por favor ingrese la contraseña del certificado');
+      alert('Por favor ingrese la contraseña del certificado');
       return;
     }
     
     setIsLoading(true);
-    setError('');
     
     try {
+      console.log('🔄 Iniciando subida de certificado...');
+      console.log('📁 Archivo:', selectedFile.name);
+      console.log('🔑 Contraseña proporcionada:', password ? '***' : 'NO PROPORCIONADA');
+      
       await onCertificateUpload(selectedFile, password);
+      
+      console.log('✅ Certificado subido exitosamente');
       setSelectedFile(null);
       setPassword('');
     } catch (error) {
-      setError(error.message);
+      console.error('❌ Error en handleSubmit:', error);
+      // El error se maneja en el componente padre (modal)
     } finally {
       setIsLoading(false);
     }
@@ -65,8 +73,6 @@ const CertificateUpload = ({ onCertificateUpload }) => {
           Sube tu certificado .p12 o crea un certificado del sistema
         </p>
       </div>
-
-
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 hover:border-blue-400 hover:bg-blue-50">
@@ -127,13 +133,6 @@ const CertificateUpload = ({ onCertificateUpload }) => {
                 Subir Certificado
               </Button>
             </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-3 animate-in slide-in-from-top">
-            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <p className="text-red-700 font-medium">{error}</p>
           </div>
         )}
       </form>
