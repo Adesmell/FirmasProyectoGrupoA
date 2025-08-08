@@ -43,7 +43,7 @@ export const validateCertificatePassword = async (certificateId, password) => {
       password
     };
     
-    const response = await axios.post(`${API_CONFIG.BASE_URL}/certificados/validate`, requestData, {
+    const response = await axios.post(`${API_CONFIG.BASE_URL}/certificados/validate-password`, requestData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
