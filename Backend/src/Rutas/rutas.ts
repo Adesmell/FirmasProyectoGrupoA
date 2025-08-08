@@ -28,7 +28,9 @@ import {
 import { 
   uploadCertificado, 
   getCertificadosByUsuario, 
-  deleteCertificado 
+  deleteCertificado,
+  generateCertificado,
+  generateCertificatePyHanko
 } from "../Controllers/CertificadoController";
 import { 
   getNotificaciones,
@@ -38,13 +40,23 @@ import {
   rechazarSolicitudFirma,
   getEstadisticasNotificaciones
 } from "../Controllers/NotificacionController";
+import {
+  crearSolicitudFirmaMultiple,
+  obtenerSolicitudesFirma,
+  obtenerHistorialFirmas,
+  obtenerEstadisticasFirmas,
+  marcarFirmaCompletada
+} from "../Controllers/SolicitudFirmaController";
 import { uploadDoc } from "../Almacenamiento/DocumentosStorage";
 import { uploadCert } from "../Almacenamiento/CertificadoStorage";
+import Documento from "../Models/Documento";
+import Certificado from "../Models/Certificado";
+import SolicitudFirma from "../Models/SolicitudFirma";
 
 const router = Router();
 
 // Middleware para manejar errores de multer
-const handleMulterError = (error, req, res, next) => {
+const handleMulterError = (error: any, req: any, res: any, next: any) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({ mensaje: 'El archivo es demasiado grande. Máximo 10MB' });
@@ -93,6 +105,8 @@ router.get('/documentos/:documentId/signed', auth, downloadSignedDocument);
 // Rutas protegidas - Certificados
 router.post('/certificados/upload', auth, uploadCert.single('certificado'), uploadCertificado);
 router.get('/certificados/usuario', auth, getCertificadosByUsuario);
+router.post('/certificados/generate', auth, generateCertificado);
+router.post('/certificados/generate-pyhanko', auth, generateCertificatePyHanko);
 router.delete('/certificados/:id', auth, deleteCertificado);
 
 // Rutas protegidas - Notificaciones
@@ -102,5 +116,60 @@ router.post('/signature-requests', auth, crearSolicitudFirma);
 router.post('/signature-requests/:id/accept', auth, aceptarSolicitudFirma);
 router.post('/signature-requests/:id/reject', auth, rechazarSolicitudFirma);
 router.get('/notifications/stats', auth, getEstadisticasNotificaciones);
+
+// Rutas protegidas - Solicitudes de Firma Múltiple
+router.post('/signature-requests/multiple', auth, crearSolicitudFirmaMultiple);
+router.get('/signature-requests', auth, obtenerSolicitudesFirma);
+router.post('/signature-requests/:id/complete', auth, marcarFirmaCompletada);
+
+// Rutas protegidas - Historial de Firmas
+router.get('/signature-history', auth, obtenerHistorialFirmas);
+router.get('/signature-stats', auth, obtenerEstadisticasFirmas);
+
+// Ruta para estadísticas generales del usuario
+router.get('/user-stats', auth, async (req: any, res: any) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+    }
+    
+    // Obtener estadísticas de documentos
+    const documentos = await Documento.find({ usuarioId: userId });
+    const documentosFirmados = documentos.filter((doc: any) => doc.estado === 'firmado');
+    
+    // Obtener estadísticas de certificados
+    const certificados = await Certificado.find({ usuarioId: userId });
+    
+    // Obtener estadísticas de solicitudes de firma
+    const solicitudesFirma = await SolicitudFirma.find({ 
+      $or: [
+        { solicitanteId: userId },
+        { 'firmantes.usuarioId': userId }
+      ]
+    });
+    
+    const solicitudesPendientes = solicitudesFirma.filter((sol: any) => 
+      sol.estado === 'activa'
+    );
+    
+    res.json({
+      success: true,
+      stats: {
+        totalDocumentos: documentos.length,
+        documentosFirmados: documentosFirmados.length,
+        totalCertificados: certificados.length,
+        solicitudesPendientes: solicitudesPendientes.length,
+        totalSolicitudes: solicitudesFirma.length
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas del usuario:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener estadísticas del usuario' 
+    });
+  }
+});
 
 export default router;

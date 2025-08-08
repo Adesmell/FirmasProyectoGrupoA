@@ -6,6 +6,9 @@ import { ForgotPasswordPage } from './components/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Principal from './components/Pages/Principal';
+import ProfilePage from './components/Pages/ProfilePage';
+import CertificateUploadPage from './components/Pages/CertificateUploadPage';
+import CertificateGeneratorPage from './components/Pages/CertificateGeneratorPage';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
@@ -25,6 +28,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Principal />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/certificates/upload" 
+            element={
+              <ProtectedRoute>
+                <CertificateUploadPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/certificates/generate" 
+            element={
+              <ProtectedRoute>
+                <CertificateGeneratorPage />
               </ProtectedRoute>
             } 
           />

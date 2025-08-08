@@ -7,14 +7,14 @@ import StatsCards from '../ui/StatsCards';
 import Notification from '../ui/Notification';
 import { DocumentStatus } from '../document/types';
 import { uploadpdf, getUserDocuments, deleteDocument, downloadDocument, signDocument } from '../services/UploadService';
+import { getUserCertificates } from '../services/CertificateService';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import CertificateUpload from '../certificate/CertificateUpload';
-import CertificateList from '../certificate/CertificateList';
-import CertificateGenerator from '../certificate/CertificateGenerator';
+
 import DocumentSigningModal from '../signing/DocumentSigningModal';
 import SignatureRequestModal from '../document/SignatureRequestModal';
-import { uploadCertificate, getUserCertificates, deleteCertificate } from '../services/CertificateService';
+
+
 
 function Principal() {
   const [documents, setDocuments] = useState([]);
@@ -26,10 +26,10 @@ function Principal() {
   const [showSigningModal, setShowSigningModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [notification, setNotification] = useState(null);
-  const [showCertificateSection, setShowCertificateSection] = useState(false);
-  const [certificateTab, setCertificateTab] = useState('upload'); // 'upload' or 'generate'
+
   const [signingModal, setSigningModal] = useState({ isOpen: false, document: null });
   const [signatureRequestModal, setSignatureRequestModal] = useState({ isOpen: false, document: null });
+
   const { user: currentUser } = useAuth();
 
   // Función para cargar documentos desde el servidor
@@ -95,7 +95,18 @@ function Principal() {
   // Cargar documentos al montar el componente
   useEffect(() => {
     fetchDocuments(true);
+    loadUserCertificates();
   }, []);
+
+  // Función para cargar certificados del usuario
+  const loadUserCertificates = async () => {
+    try {
+      const userCertificates = await getUserCertificates();
+      setCertificates(userCertificates);
+    } catch (error) {
+      console.error('Error cargando certificados:', error);
+    }
+  };
 
   // Bienvenida al usuario
   useEffect(() => {
@@ -296,75 +307,12 @@ function Principal() {
     }
   };
 
-  // useEffect para cargar certificados del usuario
-  useEffect(() => {
-    loadUserCertificates();
-  }, []);
 
-  // Añadir función para manejar la subida de certificados
-  const handleCertificateUpload = async (file, password) => {
-    try {
-      showNotification('info', 'Subiendo certificado...');
-      const result = await uploadCertificate(file, password);
-      
-      // Recargar la lista completa de certificados desde el servidor
-      await loadUserCertificates();
-      
-      showNotification('success', 'Certificado subido correctamente');
-      return result;
-    } catch (error) {
-      console.error('Error al subir certificado:', error);
-      showNotification('error', `Error al subir certificado: ${error.message}`);
-      throw error;
-    }
-  };
 
-  // Función para eliminar certificados
-  const handleDeleteCertificate = async (id) => {
-    try {
-      await deleteCertificate(id);
-      setCertificates(prev => prev.filter(cert => cert.id !== id));
-      showNotification('success', 'Certificado eliminado correctamente');
-    } catch (error) {
-      console.error('Error al eliminar certificado:', error);
-      showNotification('error', `Error al eliminar certificado: ${error.message}`);
-    }
-  };
 
-  // Función para cargar certificados del usuario
-  const loadUserCertificates = async () => {
-    try {
-      const userCertificates = await getUserCertificates();
-      setCertificates(userCertificates);
-    } catch (error) {
-      if (error.response && error.response.status === 404) {
-        console.log('Usuario sin certificados - comportamiento normal');
-        setCertificates([]);
-      } else {
-        console.error('Error al cargar certificados:', error);
-        showNotification('error', 'No se pudieron cargar tus certificados');
-      }
-    }
-  };
-
-  // Función para manejar la generación de certificados
-  const handleCertificateGenerated = async (result) => {
-    try {
-      showNotification('success', `Certificado ${result.filename} generado y descargado correctamente`);
-      // Recargar la lista de certificados del usuario
-      await loadUserCertificates();
-    } catch (error) {
-      console.error('Error después de generar certificado:', error);
-    }
-  };
 
   // Función para abrir el modal de firma
   const handleSignDocument = (document) => {
-    if (certificates.length === 0) {
-      showNotification('error', 'Necesitas al menos un certificado para firmar documentos');
-      setShowCertificateSection(true);
-      return;
-    }
     setSigningModal({ isOpen: true, document });
   };
 
@@ -416,6 +364,8 @@ function Principal() {
     setSignatureRequestModal({ isOpen: false, document: null });
   };
 
+
+
   // Manejar aceptación de solicitud de firma desde notificaciones
   const handleAcceptSignatureRequest = (documentData) => {
     console.log('🔍 Abriendo modal de firma para documento aceptado:', documentData);
@@ -438,7 +388,10 @@ function Principal() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <Header onAcceptSignature={handleAcceptSignatureRequest} />
+      <Header 
+        onAcceptSignature={handleAcceptSignatureRequest}
+        currentUser={currentUser}
+      />
       
       {/* Notification */}
       <Notification 
@@ -447,8 +400,20 @@ function Principal() {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Message */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            ¡Bienvenido, {currentUser?.nombre || currentUser?.firstName || 'Usuario'}!
+          </h1>
+          <p className="text-gray-600">
+            Gestiona tus documentos y firmas digitales de manera segura y eficiente.
+          </p>
+        </div>
+
         {/* Stats */}
         <StatsCards documents={documents} />
+
+
 
         <div className="space-y-8">
           {/* Upload Section */}
@@ -477,79 +442,6 @@ function Principal() {
               />
             )}
           </section>
-        </div>
-
-        {/* Certificados Section */}
-        <div className="space-y-8 mt-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-800">Certificados Digitales</h2>
-            <button
-              onClick={() => setShowCertificateSection(!showCertificateSection)}
-              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-            >
-              {showCertificateSection ? 'Ocultar' : 'Gestionar Certificados'}
-            </button>
-          </div>
-
-          {showCertificateSection && (
-            <section className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm">
-              {/* Tabs para seleccionar entre subir o generar certificado */}
-              <div className="mb-8">
-                <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
-                  <button
-                    onClick={() => setCertificateTab('upload')}
-                    className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                      certificateTab === 'upload'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Subir Certificado
-                  </button>
-                  <button
-                    onClick={() => setCertificateTab('generate')}
-                    className={`px-6 py-2 rounded-md font-medium transition-all duration-200 ${
-                      certificateTab === 'generate'
-                        ? 'bg-white text-green-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Generar Certificado
-                  </button>
-                </div>
-              </div>
-
-              {/* Contenido de las pestañas */}
-              {certificateTab === 'upload' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div>
-                    <CertificateUpload onCertificateUpload={handleCertificateUpload} />
-                  </div>
-                  <div>
-                    <CertificateList 
-                      certificates={certificates} 
-                      onDelete={handleDeleteCertificate} 
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="max-w-4xl mx-auto">
-                  <CertificateGenerator onCertificateGenerated={handleCertificateGenerated} />
-                  
-                  {/* Mostrar lista de certificados también en la pestaña de generar */}
-                  {certificates.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-4">Tus Certificados</h3>
-                      <CertificateList 
-                        certificates={certificates} 
-                        onDelete={handleDeleteCertificate} 
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
         </div>
       </main>
 
@@ -580,6 +472,8 @@ function Principal() {
         onRequestSent={handleSignatureRequestSent}
         showNotification={showNotification}
       />
+
+
     </div>
   );
 }

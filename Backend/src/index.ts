@@ -6,11 +6,13 @@ import dotenv from "dotenv";
 import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
 import Certificado from "./Models/Certificado";
 import { CAService } from "./Services/CAService";
 import { testEmailConfig } from "./Controllers/usercontroller";
 import { sequelize, testPostgresConnection } from "./config/database";
 import Usuario from "./Models/UsuarioPostgres";
+import WebSocketService from "./Services/WebSocketService";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -131,8 +133,15 @@ app.get('/test-preview/:id', (req, res) => {
   });
 });
 
-app.listen(Puerto, () => {
+// Crear servidor HTTP para WebSocket
+const server = createServer(app);
+
+// Inicializar WebSocket
+WebSocketService.initialize(server);
+
+server.listen(Puerto, () => {
   console.log(`Servidor corriendo en el puerto ${Puerto}`);
+  console.log(`WebSocket disponible en ws://localhost:${Puerto}`);
   console.log(`Test endpoint: http://localhost:${Puerto}/test`);
   console.log(`Preview test endpoint: http://localhost:${Puerto}/test-preview/123`);
 });

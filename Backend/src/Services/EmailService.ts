@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import EmailTemplateService from './EmailTemplateService';
 
 dotenv.config();
 
@@ -382,7 +383,13 @@ class EmailService {
   }
 
   // Enviar email de solicitud de firma
-  async sendSignatureRequestEmail(email: string, documentName: string, senderFirstName: string, senderLastName: string): Promise<boolean> {
+  async sendSignatureRequestEmail(email: string, documentName: string, senderFirstName: string, senderLastName: string, options?: {
+    recipientName?: string;
+    customMessage?: string;
+    multipleSigners?: boolean;
+    totalSignatures?: number;
+    completedSignatures?: number;
+  }): Promise<boolean> {
     console.log('📧 Intentando enviar email de solicitud de firma a:', email);
     
     // Si no hay credenciales válidas, simular envío exitoso
@@ -396,67 +403,30 @@ class EmailService {
       console.log('👤 Remitente:', `${senderFirstName} ${senderLastName}`);
       return true;
     }
-    
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Solicitud de firma - SignatureFlow</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .request-box { background: #e3f2fd; border: 1px solid #2196f3; color: #0d47a1; padding: 20px; border-radius: 5px; margin: 20px 0; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-          .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <div class="logo">🖋️ SignatureFlow</div>
-            <h1>Nueva solicitud de firma</h1>
-          </div>
-          <div class="content">
-            <h2>Hola,</h2>
-            <div class="request-box">
-              <strong>${senderFirstName} ${senderLastName}</strong> te ha solicitado firmar el documento:
-              <br><strong>"${documentName}"</strong>
-            </div>
-            <p>Para revisar y firmar este documento, accede a tu cuenta de SignatureFlow.</p>
-            
-            <div style="text-align: center;">
-              <a href="http://localhost:5173/principal" class="button">📋 Ver solicitud de firma</a>
-            </div>
-            
-            <p><strong>¿Qué debes hacer?</strong></p>
-            <ol>
-              <li>Inicia sesión en tu cuenta de SignatureFlow</li>
-              <li>Revisa la notificación en el panel de notificaciones</li>
-              <li>Revisa el documento y firma en la posición indicada</li>
-              <li>Confirma la firma</li>
-            </ol>
-            
-            <p><strong>Importante:</strong> Esta solicitud tiene un tiempo límite. Por favor, responde lo antes posible.</p>
-          </div>
-          <div class="footer">
-            <p>Este es un email automático, por favor no respondas a este mensaje.</p>
-            <p>&copy; 2024 SignatureFlow. Todos los derechos reservados.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
 
     try {
+      // Usar la nueva plantilla de email
+      const templateData = {
+        documentName,
+        senderName: `${senderFirstName} ${senderLastName}`,
+        recipientName: options?.recipientName || 'Usuario',
+        appUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+        multipleSigners: options?.multipleSigners || false,
+        totalSignatures: options?.totalSignatures || 1,
+        completedSignatures: options?.completedSignatures || 0,
+        progressPercentage: options?.totalSignatures 
+          ? Math.round((options.completedSignatures || 0) / options.totalSignatures * 100)
+          : 0,
+        customMessage: options?.customMessage
+      };
+
+      const emailTemplate = EmailTemplateService.renderTemplate('signature_request', templateData);
+
       await this.transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: email,
-        subject: `Solicitud de firma: ${documentName} - SignatureFlow`,
-        html: html
+        subject: emailTemplate.subject,
+        html: emailTemplate.html
       });
       
       console.log('✅ Email de solicitud de firma enviado exitosamente a:', email);
