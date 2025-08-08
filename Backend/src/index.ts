@@ -13,6 +13,7 @@ import { testEmailConfig } from "./Controllers/usercontroller";
 import { sequelize, testPostgresConnection } from "./config/database";
 import Usuario from "./Models/UsuarioPostgres";
 import WebSocketService from "./Services/WebSocketService";
+import { auth } from "./Middleware/authMiddleware";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -46,8 +47,7 @@ await testPostgresConnection();
 await sequelize.sync({ alter: true }); // Sincronizar tablas
 console.log('✅ Tabla de usuarios sincronizada en PostgreSQL');
 
-// Conexión a MongoDB para documentos y certificados (COMENTADO PARA DESARROLLO LOCAL)
-/*
+// Conexión a MongoDB
 await mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/Documentos", {
     authSource: "admin",
@@ -56,7 +56,7 @@ await mongoose
     dbName: process.env.MONGODB_DB || "Documentos",
   })
   .then(async () => {
-    console.log("Conectado a MongoDB ");
+    console.log("✅ Conectado a MongoDB (Documentos)");
     // Limpiar índices problemáticos de certificados
     try {
       await (Certificado as any).fixIndexes();
@@ -79,32 +79,9 @@ await mongoose
       console.log("⚠️ Error verificando configuración de email:", error);
     }
   })
-  .catch((err) => console.error("Error de conexión a MongoDB:", err));
-*/
-
-// Conexión simple a MongoDB para desarrollo local
-await mongoose
-  .connect("mongodb://localhost:27017/Documentos")
-  .then(async () => {
-    console.log("✅ Conectado a MongoDB local");
-    
-    // Inicializar sistema CA
-    try {
-      await CAService.initializeCA();
-    } catch (error) {
-      console.log("⚠️ Error inicializando sistema CA:", error);
-    }
-
-    // Verificar configuración de email
-    try {
-      await testEmailConfig();
-    } catch (error) {
-      console.log("⚠️ Error verificando configuración de email:", error);
-    }
-  })
   .catch((err) => {
-    console.log("⚠️ MongoDB no disponible - continuando sin MongoDB");
-    console.log("ℹ️ Para habilitar MongoDB, asegúrate de que esté corriendo en localhost:27017");
+    console.log("⚠️ Error de conexión a MongoDB:", err);
+    console.log("ℹ️ Verifica que MongoDB esté corriendo y las credenciales sean correctas");
   });
 
 app.use("/api/", router);
@@ -117,6 +94,15 @@ app.get('/', (req, res) => {
 // Endpoint de prueba para verificar que el servidor está funcionando
 app.get('/test', (req, res) => {
   res.json({ message: 'Server is running', timestamp: new Date().toISOString() });
+});
+
+// Endpoint de prueba para verificar autenticación
+app.get('/test-auth', auth, (req, res) => {
+  res.json({ 
+    message: 'Authentication working', 
+    user: req.user,
+    timestamp: new Date().toISOString() 
+  });
 });
 
 // Endpoint de prueba para preview

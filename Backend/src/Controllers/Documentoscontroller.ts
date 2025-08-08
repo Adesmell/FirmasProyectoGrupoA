@@ -149,7 +149,7 @@ export const previewDocumento = async (req: Request, res: Response, next: NextFu
 
     console.log('🔍 Buscando documento en BD...');
     // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId });
+    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
     
     if (!documento) {
       console.log('❌ Documento no encontrado en BD');
@@ -264,7 +264,7 @@ export const downloadDocumento = async (req: Request, res: Response, next: NextF
     // }
 
     // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId });
+    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
     
     if (!documento) {
       res.status(404).json({ mensaje: "Documento no encontrado" });
@@ -324,7 +324,7 @@ export const deleteDocumento = async (req: Request, res: Response, next: NextFun
     }
 
     // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId });
+    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
     
     if (!documento) {
       res.status(404).json({ mensaje: "Documento no encontrado" });

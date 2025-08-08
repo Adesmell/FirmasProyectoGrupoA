@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { auth } from "../Middleware/authMiddleware";
+import jwt from "jsonwebtoken";
 import { 
   registrarUsuario, 
   iniciarSesion, 
@@ -52,6 +53,7 @@ import { uploadCert } from "../Almacenamiento/CertificadoStorage";
 import Documento from "../Models/Documento";
 import Certificado from "../Models/Certificado";
 import SolicitudFirma from "../Models/SolicitudFirma";
+import Usuario from "../Models/UsuarioPostgres";
 
 const router = Router();
 
@@ -88,6 +90,41 @@ router.get('/user/profile', auth, (req, res) => {
   res.json({ user: req.user });
 });
 router.get('/usuarios', auth, getUsuarios);
+
+// Endpoint para renovar token
+router.post('/auth/refresh', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Obtener datos del usuario desde PostgreSQL
+    const user = await Usuario.findByPk(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    
+    // Crear nuevo token
+    const token = jwt.sign({ 
+      id: user.id,
+      emailVerificado: user.emailVerificado
+    }, process.env.JWT_SECRET || "KBewxVc$WSWtCkZ9YvJ!6K", { expiresIn: "1h" });
+
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        firstName: user.nombre,
+        lastName: user.apellido,
+        email: user.email,
+        emailVerificado: user.emailVerificado
+      },
+    });
+  } catch (error) {
+    console.error('❌ Error renovando token:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
 
 // Rutas protegidas - Documentos
 router.post('/documentos/upload', auth, uploadDoc.single('archivo'), handleMulterError, uploadDocumento);

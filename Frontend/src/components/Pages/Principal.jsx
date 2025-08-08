@@ -30,7 +30,7 @@ function Principal() {
   const [signingModal, setSigningModal] = useState({ isOpen: false, document: null });
   const [signatureRequestModal, setSignatureRequestModal] = useState({ isOpen: false, document: null });
 
-  const { user: currentUser } = useAuth();
+  const { currentUser, authenticated } = useAuth();
 
   // Función para cargar documentos desde el servidor
   const fetchDocuments = async (showSuccessMessage = false) => {
@@ -126,6 +126,12 @@ function Principal() {
   };
 
   const handleFileUpload = async (files) => {
+    // Verificar autenticación antes de subir archivos
+    if (!authenticated || !currentUser) {
+      showNotification('error', 'Debe iniciar sesión para subir archivos');
+      return;
+    }
+
     // Verificar si ya hay una subida en progreso
     if (isUploading) {
       showNotification('warning', 'Espere a que termine la subida actual');

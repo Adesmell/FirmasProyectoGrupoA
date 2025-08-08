@@ -10,7 +10,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
     const userId = (req as any).user.id;
     
     const notificaciones = await Notificacion.find({ 
-      destinatario_id: userId 
+      destinatario_id: userId.toString() 
     })
     .sort({ fecha_creacion: -1 })
     .limit(50);
@@ -41,7 +41,7 @@ export const marcarComoLeida = async (req: Request, res: Response, next: NextFun
     const userId = (req as any).user.id;
 
     const notificacion = await Notificacion.findOneAndUpdate(
-      { _id: id, destinatario_id: userId },
+      { _id: id, destinatario_id: userId.toString() },
       { 
         leida: true, 
         fecha_lectura: new Date() 
@@ -163,7 +163,7 @@ export const aceptarSolicitudFirma = async (req: Request, res: Response, next: N
     // Verificar que la notificación existe y es para este usuario
     const notificacion = await Notificacion.findOne({
       _id: id,
-      destinatario_id: userId,
+      destinatario_id: userId.toString(),
       tipo: 'signature_request'
     });
 
@@ -228,7 +228,7 @@ export const rechazarSolicitudFirma = async (req: Request, res: Response, next: 
     // Verificar que la notificación existe y es para este usuario
     const notificacion = await Notificacion.findOne({
       _id: id,
-      destinatario_id: userId,
+      destinatario_id: userId.toString(),
       tipo: 'signature_request'
     });
 
@@ -280,10 +280,10 @@ export const getEstadisticasNotificaciones = async (req: Request, res: Response,
     const userId = (req as any).user.id;
 
     const [total, noLeidas, solicitudesPendientes] = await Promise.all([
-      Notificacion.countDocuments({ destinatario_id: userId }),
-      Notificacion.countDocuments({ destinatario_id: userId, leida: false }),
+      Notificacion.countDocuments({ destinatario_id: userId.toString() }),
+      Notificacion.countDocuments({ destinatario_id: userId.toString(), leida: false }),
       Notificacion.countDocuments({ 
-        destinatario_id: userId, 
+        destinatario_id: userId.toString(), 
         tipo: 'signature_request', 
         leida: false 
       })

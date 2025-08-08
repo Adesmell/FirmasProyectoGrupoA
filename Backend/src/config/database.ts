@@ -6,11 +6,11 @@ dotenv.config();
 // Configuración de PostgreSQL para usuarios
 export const sequelize = new Sequelize({
   dialect: 'postgres',
-  host: process.env.POSTGRES_HOST,
+  host: process.env.POSTGRES_HOST || 'localhost',
   port: parseInt(process.env.POSTGRES_PORT || '5432'),
-  username: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-  database: process.env.POSTGRES_DB,
+  username: process.env.POSTGRES_USER || 'postgres',
+  password: process.env.POSTGRES_PASSWORD || 'admin',
+  database: process.env.POSTGRES_DB || 'firmas',
   logging: false, // Desactivar logs SQL en producción
   pool: {
     max: 5,

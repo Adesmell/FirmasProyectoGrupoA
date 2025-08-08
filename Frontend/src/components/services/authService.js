@@ -101,6 +101,12 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.log('401 error detected, clearing stored auth');
       clearStoredAuth();
+      
+      // Redirigir al usuario a la página de login
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login';
+      }
+      
       window.dispatchEvent(new CustomEvent('auth-error', {
         detail: { message: 'Su sesión ha expirado. Por favor, inicie sesión nuevamente.' }
       }));

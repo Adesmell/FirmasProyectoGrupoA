@@ -187,7 +187,7 @@ export const signDocument = async (req: Request, res: Response, next: NextFuncti
     const Documento = (await import('../Models/Documento')).default;
     const Certificado = (await import('../Models/Certificado')).default;
     
-    const document = await Documento.findOne({ _id: documentId, usuario_id: userId });
+    const document = await Documento.findOne({ _id: documentId, usuario_id: userId.toString() });
     const certificate = await Certificado.findOne({ _id: certificateId, userId });
 
     if (!document) {
@@ -325,7 +325,7 @@ export const getDocument = async (req: Request, res: Response, next: NextFunctio
     const userId = (req as any).user.id;
 
     const Documento = (await import('../Models/Documento')).default;
-    const document = await Documento.findOne({ _id: id, usuario_id: userId });
+    const document = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
 
     if (!document) {
       return res.status(404).json({ message: 'Documento no encontrado' });
@@ -349,7 +349,7 @@ export const downloadSignedDocument = async (req: Request, res: Response, next: 
     console.log('  userId:', userId);
 
     const Documento = (await import('../Models/Documento')).default;
-    const document = await Documento.findOne({ _id: documentId, usuario_id: userId });
+    const document = await Documento.findOne({ _id: documentId, usuario_id: userId.toString() });
 
     if (!document) {
       console.log('❌ Documento no encontrado');
