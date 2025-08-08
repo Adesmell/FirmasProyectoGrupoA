@@ -7,6 +7,15 @@ export const signDocumentWithCertificate = async (documentId, certificateId, pas
   try {
     const token = getToken();
     
+    // Debug: Verificar el token
+    console.log('🔍 Debug - Token obtenido:', token ? 'SÍ' : 'NO');
+    console.log('🔍 Debug - Token valor:', token);
+    console.log('🔍 Debug - Token tipo:', typeof token);
+    
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible');
+    }
+    
     const response = await axios.post(`${API_CONFIG.BASE_URL}/documentos/sign`, {
       documentId,
       certificateId,

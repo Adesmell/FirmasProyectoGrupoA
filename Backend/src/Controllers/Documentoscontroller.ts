@@ -2,6 +2,7 @@ import Documento from "../Models/Documento";
 import type { Request, Response, NextFunction } from "express";
 import fs from 'fs';
 import path from 'path';
+import { findDocumentWithUserCheck } from '../utils/userIdHelper';
 
 export const uploadDocumento = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -148,8 +149,8 @@ export const previewDocumento = async (req: Request, res: Response, next: NextFu
     // }
 
     console.log('🔍 Buscando documento en BD...');
-    // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
+    // Buscar el documento usando el helper que maneja diferentes formatos de ID
+    const documento = await findDocumentWithUserCheck(Documento, id, userId);
     
     if (!documento) {
       console.log('❌ Documento no encontrado en BD');
@@ -263,8 +264,8 @@ export const downloadDocumento = async (req: Request, res: Response, next: NextF
     //   return next();
     // }
 
-    // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
+    // Buscar el documento usando el helper que maneja diferentes formatos de ID
+    const documento = await findDocumentWithUserCheck(Documento, id, userId);
     
     if (!documento) {
       res.status(404).json({ mensaje: "Documento no encontrado" });
@@ -323,8 +324,8 @@ export const deleteDocumento = async (req: Request, res: Response, next: NextFun
       return next();
     }
 
-    // Buscar el documento y verificar que pertenece al usuario
-    const documento = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
+    // Buscar el documento usando el helper que maneja diferentes formatos de ID
+    const documento = await findDocumentWithUserCheck(Documento, id, userId);
     
     if (!documento) {
       res.status(404).json({ mensaje: "Documento no encontrado" });

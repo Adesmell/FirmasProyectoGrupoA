@@ -5,6 +5,7 @@ import tmp from 'tmp';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { findDocumentWithUserCheck, debugAllDocuments, debugUserDocuments } from '../utils/userIdHelper';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -187,9 +188,24 @@ export const signDocument = async (req: Request, res: Response, next: NextFuncti
     const Documento = (await import('../Models/Documento')).default;
     const Certificado = (await import('../Models/Certificado')).default;
     
-    const document = await Documento.findOne({ _id: documentId, usuario_id: userId.toString() });
+    console.log('🔍 Buscando documento con query:', { _id: documentId, usuario_id: userId });
+    console.log('🔍 Tipos de datos:', { 
+      documentId_type: typeof documentId, 
+      userId_type: typeof userId,
+      documentId: documentId,
+      userId: userId
+    });
+    
+        // Debug: Mostrar todos los documentos en la BD
+    await debugAllDocuments(Documento);
+    
+    // Debug: Mostrar documentos del usuario actual
+    await debugUserDocuments(Documento, userId);
+    
+    // Buscar documento usando el helper que maneja diferentes formatos de ID
+    const document = await findDocumentWithUserCheck(Documento, documentId, userId);
     const certificate = await Certificado.findOne({ _id: certificateId, userId });
-
+    
     if (!document) {
       console.log('❌ Documento no encontrado:', { documentId, userId });
       return res.status(404).json({ message: 'Documento no encontrado' });
@@ -325,7 +341,7 @@ export const getDocument = async (req: Request, res: Response, next: NextFunctio
     const userId = (req as any).user.id;
 
     const Documento = (await import('../Models/Documento')).default;
-    const document = await Documento.findOne({ _id: id, usuario_id: userId.toString() });
+    const document = await Documento.findOne({ _id: id, usuario_id: userId });
 
     if (!document) {
       return res.status(404).json({ message: 'Documento no encontrado' });
@@ -349,7 +365,7 @@ export const downloadSignedDocument = async (req: Request, res: Response, next: 
     console.log('  userId:', userId);
 
     const Documento = (await import('../Models/Documento')).default;
-    const document = await Documento.findOne({ _id: documentId, usuario_id: userId.toString() });
+    const document = await Documento.findOne({ _id: documentId, usuario_id: userId });
 
     if (!document) {
       console.log('❌ Documento no encontrado');

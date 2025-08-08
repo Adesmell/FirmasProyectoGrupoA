@@ -14,7 +14,7 @@ export const generateQRForCertificate = async (certificate) => {
   try {
     // Extraer solo la información necesaria del certificado
     const subject = certificate.subject || {};
-    const nombre = subject.commonName || 'Sin nombre';
+    const nombre = subject.commonName || certificate.alias || certificate.fileName || 'Sin nombre';
     const organizacion = subject.organizationName || 'Sin organización';
     const correo = subject.emailAddress || 'sin@correo.com';
     const fechaFirma = new Date().toLocaleString();
@@ -24,6 +24,8 @@ export const generateQRForCertificate = async (certificate) => {
     
     // Generar URL del QR usando API externa
     const qrImageUrl = `${QR_API_BASE_URL}?size=120x120&data=${encodeURIComponent(qrText)}&format=png`;
+    
+    console.log('🔍 Generando QR con datos:', { nombre, organizacion, correo, fechaFirma });
     
     return {
       qrImageUrl,

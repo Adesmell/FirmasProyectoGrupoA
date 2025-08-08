@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PDFSignatureSelector from './PDFSignatureSelector';
 import { generateQRForCertificate } from '../services/QRService';
 import { signDocumentWithCertificate, validateCertificatePassword } from '../services/DocumentSigningService';
-import { getToken } from '../services/authService';
+import { getToken, getCurrentUser, isAuthenticated } from '../services/authService';
 import API_CONFIG from '../../config/api.js';
 
 const DocumentSigningModal = ({ 
@@ -23,6 +23,7 @@ const DocumentSigningModal = ({
   const [qrData, setQrData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSigned, setIsSigned] = useState(false);
+  const [error, setError] = useState(null);
 
   // Resetear el estado cuando se cierra el modal
   useEffect(() => {
@@ -34,22 +35,24 @@ const DocumentSigningModal = ({
       setQrData(null);
       setIsLoading(false);
       setIsSigned(false);
+      setError(null);
     }
   }, [isOpen]);
 
-  // Si hay una posición inicial de firma, usarla y saltar al paso de certificado
+  // Si hay una posición inicial de firma, usarla pero no saltar automáticamente
   useEffect(() => {
     if (isOpen && initialSignaturePosition && !signaturePosition) {
       console.log('🔍 Usando posición de firma inicial:', initialSignaturePosition);
       setSignaturePosition(initialSignaturePosition);
-      setStep('select-certificate');
+      // No cambiar automáticamente el paso, dejar que el usuario vea el documento primero
     }
   }, [isOpen, initialSignaturePosition, signaturePosition]);
 
   // Manejar la selección de posición
   const handlePositionSelect = useCallback((position) => {
+    console.log('📍 Posición seleccionada:', position);
     setSignaturePosition(position);
-    setStep('select-certificate');
+    // No cambiar automáticamente al siguiente paso, dejar que el usuario decida
   }, []);
 
   const handleCertificateSelect = async (certificate) => {
@@ -106,18 +109,59 @@ const DocumentSigningModal = ({
 
   const performSigning = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Debug: Mostrar información del usuario actual
+      const currentUser = getCurrentUser();
+      console.log('🔍 Usuario actual:', currentUser);
+      console.log('🔍 Documento a firmar:', document);
+      console.log('🔍 ID del usuario actual:', currentUser?.id);
+      console.log('🔍 ID del documento:', document?._id || document?.id);
+      
+      // Debug: Verificar autenticación
+      const isAuth = isAuthenticated();
+      console.log('🔍 Usuario autenticado:', isAuth);
+      
+      // Debug: Verificar token
+      const token = getToken();
+      console.log('🔍 Token disponible:', token ? 'SÍ' : 'NO');
+      console.log('🔍 Token valor:', token);
+      
+      if (!isAuth || !token) {
+        throw new Error('Usuario no autenticado. Por favor, inicie sesión nuevamente.');
+      }
+      
       // Obtener la imagen QR como base64
       let qrImageBase64 = null;
       if (qrData && qrData.qrImageUrl) {
-        // Descargar la imagen y convertirla a base64
-        const response = await fetch(qrData.qrImageUrl);
-        const blob = await response.blob();
-        qrImageBase64 = await new Promise((resolve, reject) => {
-          const reader = new window.FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        try {
+          // Descargar la imagen y convertirla a base64 con timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+          
+          const response = await fetch(qrData.qrImageUrl, {
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const blob = await response.blob();
+          qrImageBase64 = await new Promise((resolve, reject) => {
+            const reader = new window.FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          console.log('✅ QR code generado exitosamente');
+        } catch (qrError) {
+          console.warn('⚠️ Error al obtener QR code, continuando sin QR:', qrError.message);
+          // Continuar sin QR code si hay error de red
+          qrImageBase64 = null;
+        }
       }
       
       // Obtener dimensiones del canvas si están disponibles
@@ -185,8 +229,11 @@ const DocumentSigningModal = ({
       onSigningComplete(result);
     } catch (error) {
       console.error('Error al firmar documento:', error);
+      setError(error.message || 'Error al firmar el documento');
       showNotification('error', error.message || 'Error al firmar el documento');
       setStep('enter-password'); // Volver al paso anterior
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -353,74 +400,125 @@ const DocumentSigningModal = ({
                 3
               </div>
             </div>
-            <div className="flex justify-between text-xs text-gray-600 mt-2 px-2">
-              <span className="text-center">Seleccionar<br/>ubicación</span>
-              <span className="text-center">Seleccionar<br/>certificado</span>
-              <span className="text-center">Ingresar<br/>contraseña</span>
-            </div>
+                         <div className="flex justify-between text-xs text-gray-600 mt-2 px-2">
+               <span className="text-center">Revisar documento<br/>y ubicación</span>
+               <span className="text-center">Seleccionar<br/>certificado</span>
+               <span className="text-center">Ingresar<br/>contraseña</span>
+             </div>
           </div>
 
-                     {/* Step 1: Select Position */}
-           {step === 'select-position' && (
-             <div>
-               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                 Seleccione la ubicación de la firma
-               </h3>
-               <p className="text-sm text-gray-600 mb-4">
-                 Haz clic en el PDF para seleccionar dónde colocar la firma. Esta posición se guardará para futuras firmas.
-               </p>
-               <div className="border rounded-lg p-4 bg-gray-50 h-96">
-                 <PDFSignatureSelector 
-                   document={document} 
-                   onPositionSelect={handlePositionSelect} 
-                   onCancel={() => setStep('select-certificate')}
-                 />
-               </div>
-               {signaturePosition && (
-                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                   <p className="text-sm text-green-800">
-                     Ubicación seleccionada: X: {signaturePosition.x}%, Y: {signaturePosition.y}%
-                   </p>
-                   <p className="text-xs text-green-600 mt-1">
-                     Esta posición se guardará y se usará para futuras firmas
-                   </p>
-                   <button
-                     onClick={() => setStep('select-certificate')}
-                     className="mt-2 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                   >
-                     Continuar con esta ubicación
-                   </button>
-                 </div>
-               )}
-             </div>
-           )}
-
-          {/* Step 2: Select Certificate */}
-          {step === 'select-certificate' && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Seleccionar certificado</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Seleccione el certificado con el que desea firmar el documento.
-              </p>
-              {signaturePosition && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
-                    Ubicación de firma: X: {signaturePosition.x}%, Y: {signaturePosition.y}%
+                                {/* Step 1: View Document and Select Position */}
+            {step === 'select-position' && (
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Revisar documento y seleccionar ubicación de firma
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Primero revisa el documento y luego haz clic en el PDF para seleccionar dónde colocar la firma.
+                </p>
+                
+                {/* Información del documento */}
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Información del documento:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• <strong>Nombre:</strong> {document?.name || document?.nombre_original}</li>
+                    <li>• <strong>Tamaño:</strong> {document?.size ? `${(document.size / 1024 / 1024).toFixed(2)} MB` : 'No disponible'}</li>
+                    <li>• <strong>Fecha de subida:</strong> {document?.uploadDate ? new Date(document.uploadDate).toLocaleDateString() : 'No disponible'}</li>
+                  </ul>
+                </div>
+                
+                <div className="border rounded-lg p-4 bg-gray-50 h-96">
+                  <PDFSignatureSelector 
+                    document={document} 
+                    onPositionSelect={handlePositionSelect} 
+                    onCancel={() => setStep('select-certificate')}
+                  />
+                </div>
+                
+                {signaturePosition && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      ✅ Ubicación seleccionada: X: {signaturePosition.x}%, Y: {signaturePosition.y}%
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Esta posición se guardará y se usará para futuras firmas
+                    </p>
+                    <div className="mt-3 flex space-x-3">
+                      <button
+                        onClick={() => setStep('select-certificate')}
+                        className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Continuar con esta ubicación
+                      </button>
+                      <button
+                        onClick={() => setSignaturePosition(null)}
+                        className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Cambiar ubicación
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {!signaturePosition && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      💡 Haz clic en el documento para seleccionar la ubicación de la firma
                     </p>
                   </div>
                 )}
-                <div className="space-y-3">
-                  {certificates.length > 0 ? (
-                    certificates.map((cert) => {
-                      console.log('Certificado en modal:', cert);
-                      return (
-                      <div 
-                        key={cert._id || cert.id}
-                        onClick={() => handleCertificateSelect(cert)}
-                        className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
-                          selectedCertificate?._id === cert._id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                        }`}
-                      >
+              </div>
+            )}
+
+                     {/* Step 2: Select Certificate */}
+           {step === 'select-certificate' && (
+             <div>
+               <h3 className="text-lg font-medium text-gray-900 mb-4">Seleccionar certificado</h3>
+               <p className="text-sm text-gray-600 mb-4">
+                 Seleccione el certificado con el que desea firmar el documento.
+               </p>
+               
+               {/* Resumen de la configuración */}
+               <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                 <h4 className="font-medium text-gray-900 mb-2">Resumen de la configuración:</h4>
+                 <ul className="text-sm text-gray-600 space-y-1">
+                   <li>• <strong>Documento:</strong> {document?.name || document?.nombre_original}</li>
+                   <li>• <strong>Ubicación de firma:</strong> X: {signaturePosition?.x || 0}%, Y: {signaturePosition?.y || 0}%</li>
+                   <li>• <strong>Página:</strong> {signaturePosition?.page || 1}</li>
+                 </ul>
+                 <button
+                   onClick={() => setStep('select-position')}
+                   className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
+                 >
+                   ← Cambiar ubicación de firma
+                 </button>
+               </div>
+                                 <div className="space-y-3">
+                   {!signaturePosition && (
+                     <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                       <p className="text-sm text-red-800">
+                         ⚠️ Primero debes seleccionar una ubicación de firma en el documento
+                       </p>
+                       <button
+                         onClick={() => setStep('select-position')}
+                         className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                       >
+                         ← Volver a seleccionar ubicación
+                       </button>
+                     </div>
+                   )}
+                   
+                   {certificates.length > 0 ? (
+                     certificates.map((cert) => {
+                       console.log('Certificado en modal:', cert);
+                       return (
+                       <div 
+                         key={cert._id || cert.id}
+                         onClick={() => signaturePosition ? handleCertificateSelect(cert) : null}
+                         className={`p-4 border rounded-lg transition-colors ${
+                           selectedCertificate?._id === cert._id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                         } ${signaturePosition ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}
+                       >
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
                             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -503,12 +601,20 @@ const DocumentSigningModal = ({
             </div>
           )}
 
-          {/* Step 3: Enter Password */}
-          {step === 'enter-password' && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Contraseña del certificado
-              </h3>
+                     {/* Step 3: Enter Password */}
+           {step === 'enter-password' && (
+             <div>
+               <h3 className="text-lg font-medium text-gray-900 mb-4">
+                 Contraseña del certificado
+               </h3>
+               
+               {error && (
+                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                   <p className="text-sm text-red-800">
+                     ❌ {error}
+                   </p>
+                 </div>
+               )}
               
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">Resumen de la firma:</h4>
@@ -538,22 +644,22 @@ const DocumentSigningModal = ({
                   </p>
                 </div>
 
-                <div className="flex space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => setStep('select-position')}
-                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                  >
-                    Atrás
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="flex-1 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  >
-                    {isLoading ? 'Validando...' : 'Firmar documento'}
-                  </button>
-                </div>
+                                 <div className="flex space-x-3">
+                   <button
+                     type="button"
+                     onClick={() => setStep('select-certificate')}
+                     className="flex-1 px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                   >
+                     ← Volver a certificados
+                   </button>
+                   <button
+                     type="submit"
+                     disabled={isLoading}
+                     className="flex-1 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                   >
+                     {isLoading ? 'Validando...' : 'Firmar documento'}
+                   </button>
+                 </div>
               </form>
             </div>
           )}
