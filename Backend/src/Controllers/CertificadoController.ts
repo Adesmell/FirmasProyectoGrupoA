@@ -230,6 +230,9 @@ export const getCertificado = async (
   }
 };
 
+// Alias para mantener compatibilidad con las rutas
+export const getCertificadosByUsuario = getCertificado;
+
 export const generateCertificado = async (
   req: Request,
   res: Response,

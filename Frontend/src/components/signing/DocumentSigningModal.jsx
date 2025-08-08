@@ -12,7 +12,8 @@ const DocumentSigningModal = ({
   document, 
   certificates, 
   onSigningComplete,
-  showNotification 
+  showNotification,
+  signaturePosition: initialSignaturePosition 
 }) => {
   // Estados para controlar el flujo
   const [step, setStep] = useState('select-position'); // select-position, select-certificate, enter-password, signing
@@ -35,6 +36,15 @@ const DocumentSigningModal = ({
       setIsSigned(false);
     }
   }, [isOpen]);
+
+  // Si hay una posición inicial de firma, usarla y saltar al paso de certificado
+  useEffect(() => {
+    if (isOpen && initialSignaturePosition && !signaturePosition) {
+      console.log('🔍 Usando posición de firma inicial:', initialSignaturePosition);
+      setSignaturePosition(initialSignaturePosition);
+      setStep('select-certificate');
+    }
+  }, [isOpen, initialSignaturePosition, signaturePosition]);
 
   // Manejar la selección de posición
   const handlePositionSelect = useCallback((position) => {

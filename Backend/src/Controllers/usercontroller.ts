@@ -50,7 +50,8 @@ export const register = async (req: Request, res: Response) => {
     }
 
     // Generar token de verificación
-    const verificationToken = EmailService.generateVerificationToken();
+    const emailService = new EmailService();
+    const verificationToken = emailService.generateVerificationToken();
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
 
     // Encriptar contraseña
@@ -79,7 +80,7 @@ export const register = async (req: Request, res: Response) => {
 
     // Enviar email de verificación
     console.log('📧 Enviando email de verificación...');
-    const emailSent = await EmailService.sendVerificationEmail(
+    const emailSent = await emailService.sendVerificationEmail(
       newUser.email, 
       verificationToken, 
       newUser.nombre
@@ -186,7 +187,12 @@ export const verifyEmail = async (req: Request, res: Response) => {
     console.log('✅ Email verificado exitosamente para:', user.email);
 
     // Enviar email de bienvenida
-    await EmailService.sendWelcomeEmail(user.email, user.nombre);
+    try {
+      const emailService = new EmailService();
+      await emailService.sendWelcomeEmail(user.email, user.nombre);
+    } catch (emailError) {
+      console.error('❌ Error enviando email de bienvenida:', emailError);
+    }
 
     // Generar nuevo token con email verificado
     const token_jwt = jwt.sign({ 
@@ -215,11 +221,18 @@ export const verifyEmail = async (req: Request, res: Response) => {
 export const resendVerificationEmail = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email es requerido" });
+    }
+
     console.log('📧 Reenviando email de verificación a:', email);
 
+    // Buscar usuario en PostgreSQL
     const user = await Usuario.findOne({ 
       where: { email: email.toLowerCase() } 
     });
+
     if (!user) {
       return res.status(404).json({ message: "Usuario no encontrado" });
     }
@@ -228,16 +241,19 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "El email ya está verificado" });
     }
 
-    // Generar nuevo token
-    const verificationToken = EmailService.generateVerificationToken();
-    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // Generar nuevo token de verificación
+    const emailService = new EmailService();
+    const verificationToken = emailService.generateVerificationToken();
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
 
-    user.verificationToken = verificationToken;
-    user.verificationTokenExpires = verificationTokenExpires;
-    await user.save();
+    // Actualizar token en la base de datos
+    await user.update({
+      verificationToken,
+      verificationTokenExpires
+    });
 
-    // Enviar email
-    const emailSent = await EmailService.sendVerificationEmail(
+    // Enviar email de verificación
+    const emailSent = await emailService.sendVerificationEmail(
       user.email, 
       verificationToken, 
       user.nombre
@@ -383,18 +399,18 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     }
 
     // Generar token de restablecimiento
-    const resetToken = EmailService.generatePasswordResetToken();
-    const resetTokenExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    const emailService = new EmailService();
+    const resetToken = emailService.generatePasswordResetToken();
+    const resetTokenExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hora
 
-    // Guardar token en la base de datos
-    user.verificationToken = resetToken;
-    user.verificationTokenExpires = resetTokenExpires;
-    await user.save();
-
-    console.log('✅ Token de restablecimiento generado para:', email);
+    // Actualizar usuario con token de restablecimiento
+    await user.update({
+      verificationToken: resetToken,
+      verificationTokenExpires: resetTokenExpires
+    });
 
     // Enviar email de restablecimiento
-    const emailSent = await EmailService.sendPasswordResetEmail(
+    const emailSent = await emailService.sendPasswordResetEmail(
       user.email, 
       resetToken, 
       user.nombre
@@ -464,7 +480,12 @@ export const resetPassword = async (req: Request, res: Response) => {
     console.log('✅ Contraseña restablecida exitosamente para:', user.email);
 
     // Enviar email de confirmación
-    await EmailService.sendPasswordChangedEmail(user.email, user.nombre);
+    try {
+      const emailService = new EmailService();
+      await emailService.sendPasswordChangedEmail(user.email, user.nombre);
+    } catch (emailError) {
+      console.error('❌ Error enviando email de confirmación:', emailError);
+    }
 
     res.json({
       success: true,
@@ -509,13 +530,51 @@ export const verifyResetToken = async (req: Request, res: Response) => {
 // Verificar configuración de email al iniciar
 export const testEmailConfig = async () => {
   try {
-    const isConnected = await EmailService.verifyConnection();
-    if (isConnected) {
-      console.log('✅ Configuración de email verificada correctamente');
-    } else {
-      console.log('❌ Error en configuración de email');
-    }
+    const emailService = new EmailService();
+    const result = await emailService.verifyConnection();
+    console.log('✅ Configuración de email:', result);
+    return result;
   } catch (error) {
-    console.error('❌ Error verificando configuración de email:', error);
+    console.error('❌ Error en configuración de email:', error);
+    return false;
+  }
+};
+
+// Alias en español para mantener compatibilidad con las rutas
+export const registrarUsuario = register;
+export const iniciarSesion = login;
+export const verificarEmail = verifyEmail;
+export const reenviarEmailVerificacion = resendVerificationEmail;
+
+// Obtener lista de usuarios para selector de destinatarios
+export const getUsuarios = async (req: Request, res: Response) => {
+  try {
+    const currentUserId = (req as any).user.id;
+    console.log('👥 Obteniendo lista de usuarios, excluyendo usuario actual:', currentUserId);
+
+    // Obtener todos los usuarios excepto el actual
+    const usuarios = await Usuario.findAll({
+      where: {
+        id: { [Op.ne]: currentUserId }
+      },
+      attributes: ['id', 'nombre', 'apellido', 'email'],
+      order: [['nombre', 'ASC']]
+    });
+
+    const usuariosList = usuarios.map(user => ({
+      id: user.id,
+      nombre: `${user.nombre} ${user.apellido}`,
+      email: user.email
+    }));
+
+    console.log('✅ Usuarios encontrados:', usuariosList.length);
+
+    res.json({
+      success: true,
+      usuarios: usuariosList
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo usuarios:', error);
+    res.status(500).json({ message: "Error interno del servidor" });
   }
 };

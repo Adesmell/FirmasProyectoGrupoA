@@ -307,6 +307,18 @@ class EmailService {
 
   // Enviar email de confirmación de cambio de contraseña
   async sendPasswordChangedEmail(email: string, nombre: string): Promise<boolean> {
+    console.log('📧 Intentando enviar email de cambio de contraseña a:', email);
+    
+    // Si no hay credenciales válidas, simular envío exitoso
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+    
+    if (!emailUser || emailUser === 'test@example.com' || !emailPass || emailPass === 'test-password') {
+      console.log('✅ Simulando envío de email de cambio de contraseña (modo desarrollo)');
+      console.log('📧 Email simulado enviado a:', email);
+      return true;
+    }
+    
     const html = `
       <!DOCTYPE html>
       <html>
@@ -318,7 +330,7 @@ class EmailService {
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .alert { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
           .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
           .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
         </style>
@@ -331,44 +343,126 @@ class EmailService {
           </div>
           <div class="content">
             <h2>Hola ${nombre},</h2>
-            <p>Tu contraseña en <strong>SignatureFlow</strong> ha sido actualizada exitosamente.</p>
-            
-            <div class="success">
-              <strong>✅ Confirmación:</strong>
-              <ul>
-                <li>Tu contraseña ha sido cambiada correctamente</li>
-                <li>Ya puedes iniciar sesión con tu nueva contraseña</li>
-                <li>Si no fuiste tú quien hizo este cambio, contacta soporte inmediatamente</li>
-              </ul>
+            <div class="alert">
+              <strong>✅ Tu contraseña ha sido actualizada exitosamente</strong>
             </div>
-            
-            <p><strong>¿No fuiste tú?</strong></p>
-            <p>Si no solicitaste este cambio, contacta inmediatamente a nuestro equipo de soporte para asegurar tu cuenta.</p>
-            
-            <p><strong>¿Necesitas ayuda?</strong></p>
-            <p>Nuestro equipo de soporte está disponible para ayudarte con cualquier problema.</p>
+            <p>Tu contraseña en <strong>SignatureFlow</strong> ha sido cambiada recientemente.</p>
+            <p>Si no fuiste tú quien realizó este cambio, por favor contacta inmediatamente con nuestro equipo de soporte.</p>
+            <p>Para mantener tu cuenta segura, te recomendamos:</p>
+            <ul>
+              <li>Usar una contraseña única y segura</li>
+              <li>No compartir tus credenciales con nadie</li>
+              <li>Activar la autenticación de dos factores si está disponible</li>
+            </ul>
+            <p>Gracias por usar <strong>SignatureFlow</strong>.</p>
           </div>
           <div class="footer">
-            <p>© 2024 SignatureFlow. Todos los derechos reservados.</p>
-            <p>Este email fue enviado a ${email}</p>
+            <p>Este es un email automático, por favor no respondas a este mensaje.</p>
+            <p>&copy; 2024 SignatureFlow. Todos los derechos reservados.</p>
           </div>
         </div>
       </body>
       </html>
     `;
 
-    const mailOptions: EmailOptions = {
-      to: email,
-      subject: '✅ Contraseña actualizada - SignatureFlow',
-      html: html
-    };
-
     try {
-      await this.transporter.sendMail(mailOptions);
-      console.log('✅ Email de confirmación de cambio enviado a:', email);
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Contraseña actualizada - SignatureFlow',
+        html: html
+      });
+      
+      console.log('✅ Email de cambio de contraseña enviado exitosamente a:', email);
       return true;
     } catch (error) {
-      console.error('❌ Error enviando email de confirmación:', error);
+      console.error('❌ Error al enviar email de cambio de contraseña:', error);
+      return false;
+    }
+  }
+
+  // Enviar email de solicitud de firma
+  async sendSignatureRequestEmail(email: string, documentName: string, senderFirstName: string, senderLastName: string): Promise<boolean> {
+    console.log('📧 Intentando enviar email de solicitud de firma a:', email);
+    
+    // Si no hay credenciales válidas, simular envío exitoso
+    const emailUser = process.env.EMAIL_USER;
+    const emailPass = process.env.EMAIL_PASS;
+    
+    if (!emailUser || emailUser === 'test@example.com' || !emailPass || emailPass === 'test-password') {
+      console.log('✅ Simulando envío de email de solicitud de firma (modo desarrollo)');
+      console.log('📧 Email simulado enviado a:', email);
+      console.log('📄 Documento:', documentName);
+      console.log('👤 Remitente:', `${senderFirstName} ${senderLastName}`);
+      return true;
+    }
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Solicitud de firma - SignatureFlow</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .request-box { background: #e3f2fd; border: 1px solid #2196f3; color: #0d47a1; padding: 20px; border-radius: 5px; margin: 20px 0; }
+          .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+          .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">🖋️ SignatureFlow</div>
+            <h1>Nueva solicitud de firma</h1>
+          </div>
+          <div class="content">
+            <h2>Hola,</h2>
+            <div class="request-box">
+              <strong>${senderFirstName} ${senderLastName}</strong> te ha solicitado firmar el documento:
+              <br><strong>"${documentName}"</strong>
+            </div>
+            <p>Para revisar y firmar este documento, accede a tu cuenta de SignatureFlow.</p>
+            
+            <div style="text-align: center;">
+              <a href="http://localhost:5173/principal" class="button">📋 Ver solicitud de firma</a>
+            </div>
+            
+            <p><strong>¿Qué debes hacer?</strong></p>
+            <ol>
+              <li>Inicia sesión en tu cuenta de SignatureFlow</li>
+              <li>Revisa la notificación en el panel de notificaciones</li>
+              <li>Revisa el documento y firma en la posición indicada</li>
+              <li>Confirma la firma</li>
+            </ol>
+            
+            <p><strong>Importante:</strong> Esta solicitud tiene un tiempo límite. Por favor, responde lo antes posible.</p>
+          </div>
+          <div class="footer">
+            <p>Este es un email automático, por favor no respondas a este mensaje.</p>
+            <p>&copy; 2024 SignatureFlow. Todos los derechos reservados.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      await this.transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: `Solicitud de firma: ${documentName} - SignatureFlow`,
+        html: html
+      });
+      
+      console.log('✅ Email de solicitud de firma enviado exitosamente a:', email);
+      return true;
+    } catch (error) {
+      console.error('❌ Error al enviar email de solicitud de firma:', error);
       return false;
     }
   }
@@ -386,4 +480,5 @@ class EmailService {
   }
 }
 
-export default new EmailService(); 
+export { EmailService };
+export default EmailService; 

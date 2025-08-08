@@ -13,6 +13,7 @@ import CertificateUpload from '../certificate/CertificateUpload';
 import CertificateList from '../certificate/CertificateList';
 import CertificateGenerator from '../certificate/CertificateGenerator';
 import DocumentSigningModal from '../signing/DocumentSigningModal';
+import SignatureRequestModal from '../document/SignatureRequestModal';
 import { uploadCertificate, getUserCertificates, deleteCertificate } from '../services/CertificateService';
 
 function Principal() {
@@ -28,6 +29,7 @@ function Principal() {
   const [showCertificateSection, setShowCertificateSection] = useState(false);
   const [certificateTab, setCertificateTab] = useState('upload'); // 'upload' or 'generate'
   const [signingModal, setSigningModal] = useState({ isOpen: false, document: null });
+  const [signatureRequestModal, setSignatureRequestModal] = useState({ isOpen: false, document: null });
   const { user: currentUser } = useAuth();
 
   // Función para cargar documentos desde el servidor
@@ -398,9 +400,45 @@ function Principal() {
     }
   };
 
+  // Función para abrir modal de solicitud de firma
+  const handleRequestSignature = (document) => {
+    setSignatureRequestModal({ isOpen: true, document });
+  };
+
+  // Función para cerrar modal de solicitud de firma
+  const handleCloseSignatureRequest = () => {
+    setSignatureRequestModal({ isOpen: false, document: null });
+  };
+
+  // Función para manejar cuando se envía una solicitud de firma
+  const handleSignatureRequestSent = (result) => {
+    showNotification('success', 'Solicitud de firma enviada correctamente');
+    setSignatureRequestModal({ isOpen: false, document: null });
+  };
+
+  // Manejar aceptación de solicitud de firma desde notificaciones
+  const handleAcceptSignatureRequest = (documentData) => {
+    console.log('🔍 Abriendo modal de firma para documento aceptado:', documentData);
+    
+    // Crear un objeto documento compatible con el modal de firma
+    const documentForSigning = {
+      id: documentData.id,
+      name: documentData.name,
+      status: documentData.status,
+      url: documentData.path
+    };
+
+    // Abrir el modal de firma con la posición de firma específica
+    setSigningModal({
+      isOpen: true,
+      document: documentForSigning,
+      signaturePosition: documentData.signaturePosition
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <Header />
+      <Header onAcceptSignature={handleAcceptSignatureRequest} />
       
       {/* Notification */}
       <Notification 
@@ -435,6 +473,7 @@ function Principal() {
                 onDelete={handleDelete}
                 onDownload={handleDownload}
                 onSign={handleSignDocument}
+                onRequestSignature={handleRequestSignature}
               />
             )}
           </section>
@@ -529,6 +568,16 @@ function Principal() {
         document={signingModal.document}
         certificates={certificates}
         onSigningComplete={handleSigningComplete}
+        showNotification={showNotification}
+        signaturePosition={signingModal.signaturePosition}
+      />
+
+      {/* Signature Request Modal */}
+      <SignatureRequestModal
+        isOpen={signatureRequestModal.isOpen}
+        onClose={handleCloseSignatureRequest}
+        document={signatureRequestModal.document}
+        onRequestSent={handleSignatureRequestSent}
         showNotification={showNotification}
       />
     </div>
